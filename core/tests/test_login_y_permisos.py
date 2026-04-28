@@ -1,5 +1,6 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+from core.models.password_reset_token import PasswordResetToken
 
 User = get_user_model()
 
@@ -32,6 +33,37 @@ class LoginAdminTests(TestCase):
         redirige = any(URL_HOME_ADMIN in url for (url, code) in resp.redirect_chain)
         self.assertFalse(redirige, "Para admin, login con email NO debe redirigir a /home_admin/")
 
+    def test_admin_recuperacion_redirige_a_gmail(self):
+        resp = self.client.post("/recuperar-password/", {
+            "usuario_o_email": "0914",
+            "tipo_usuario": "admin"
+        }, follow=True)
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Email de recuperaci")
+
+    def test_resetear_password_con_token_valido(self):
+        # Crear un token para el admin
+        token = PasswordResetToken.generate_token()
+        PasswordResetToken.objects.create(user=self.admin, token=token)
+        
+        # Acceder a la página de reseteo
+        resp = self.client.get(f"/resetear-contraseña/{token}/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Resetear Contraseña")
+        
+        # Enviar nueva contraseña
+        resp = self.client.post(f"/resetear-contraseña/{token}/", {
+            "nueva_password": "newpass123",
+            "confirmar_password": "newpass123"
+        }, follow=True)
+        
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Contraseña actualizada correctamente")
+        
+        # Verificar que la contraseña cambió
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.check_password("newpass123"))
+
 class LoginOperadorTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -61,3 +93,11 @@ class LoginOperadorTests(TestCase):
         }, follow=True)
         redirige = any(URL_HOME_USER in url for (url, code) in resp.redirect_chain)
         self.assertTrue(redirige, "REQ: login con email debería funcionar (bug actual)")
+
+    def test_operador_recuperacion_envia_solicitud_interna(self):
+        resp = self.client.post("/recuperar-password/", {
+            "usuario_o_email": "operador@example.com",
+            "tipo_usuario": "operador"
+        }, follow=True)
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Solicitud enviada correctamente")

@@ -291,25 +291,151 @@ def operadores(request):
     ctx.update(permisos_context(request.user))
     return render(request, "operadores.html", ctx)
  
- 
+
 def recuperar_password(request):
+    """Recuperación de contraseña según el rol."""
+    from django.core.mail import send_mail
+    from django.contrib.auth import get_user_model
+    from core.models.password_reset_token import PasswordResetToken
+    
+    User = get_user_model()
+    
     if request.method == "POST":
         identificador = (request.POST.get("usuario_o_email") or "").strip()
+        tipo_usuario = (request.POST.get("tipo_usuario") or "").strip().lower()
+
+        if not tipo_usuario:
+            messages.error(request, "Seleccioná tu rol para continuar.")
+            return render(
+                request,
+                "recuperar_password.html",
+                {"usuario_o_email": identificador, "tipo_usuario": tipo_usuario},
+                status=400,
+            )
+
+        if tipo_usuario == "admin":
+            if not identificador:
+                messages.error(request, "Ingresá tu usuario o email para recuperar tu contraseña de administrador.")
+                return render(
+                    request,
+                    "recuperar_password.html",
+                    {"usuario_o_email": identificador, "tipo_usuario": tipo_usuario},
+                    status=400,
+                )
+            
+            # Buscar admin por username o email
+            try:
+                admin = User.objects.get(
+                    Q(username=identificador) | Q(email=identificador),
+                    Q(is_superuser=True) | Q(tipo_usuario="admin")
+                )
+            except User.DoesNotExist:
+                messages.warning(request, "Si este administrador existe, recibirá un email de recuperación.")
+                return render(request, "recuperar_password.html")
+            
+            # Generar token
+            token = PasswordResetToken.generate_token()
+            PasswordResetToken.objects.create(user=admin, token=token)
+            
+            # Enviar email
+            reset_link = request.build_absolute_uri(f"/resetear-contraseña/{token}/")
+            email_subject = "Recupera tu contraseña - Sistema Patrimonio Hospital"
+            email_body = f"""
+Hola {admin.username},
+
+Recibimos una solicitud para recuperar tu contraseña de administrador.
+
+Haz clic en el siguiente enlace para resetearla (válido por 24 horas):
+{reset_link}
+
+Si no solicitaste este cambio, ignora este email.
+
+Saludos,
+Sistema de Patrimonio Hospital Romero
+"""
+            
+            try:
+                send_mail(
+                    email_subject,
+                    email_body,
+                    'desposfrancisco@gmail.com',
+                    [admin.email],
+                    fail_silently=False,
+                )
+                messages.success(request, f"Email de recuperación enviado a {admin.email}.")
+            except Exception as e:
+                messages.error(request, f"Error al enviar email: {str(e)}")
+                return render(request, "recuperar_password.html")
+            
+            return redirect("recuperar_password")
+
         if not identificador:
             messages.error(request, "Ingresá tu usuario o email para enviar la solicitud.")
             return render(
                 request,
                 "recuperar_password.html",
-                {"usuario_o_email": identificador},
+                {"usuario_o_email": identificador, "tipo_usuario": tipo_usuario},
                 status=400,
             )
- 
+
+        if tipo_usuario not in ["operador", "supervisor"]:
+            messages.error(request, "Rol no válido. Seleccioná Operador o Supervisor.")
+            return render(
+                request,
+                "recuperar_password.html",
+                {"usuario_o_email": identificador, "tipo_usuario": tipo_usuario},
+                status=400,
+            )
+
         crear_notificacion_admins(
-            f"El operador '{identificador}' solicitó recuperación de contraseña."
+            f"El {tipo_usuario} '{identificador}' solicitó recuperación de contraseña."
         )
-        messages.success(request, "Solicitud enviada correctamente.")
+        messages.success(request, "Solicitud enviada correctamente. Un administrador revisará tu pedido.")
         return redirect("recuperar_password")
     return render(request, "recuperar_password.html")
+
+
+def resetear_password(request, token):
+    """Vista para resetear contraseña usando token."""
+    from core.models.password_reset_token import PasswordResetToken
+    
+    try:
+        reset_token = PasswordResetToken.objects.get(token=token)
+    except PasswordResetToken.DoesNotExist:
+        messages.error(request, "Token inválido o expirado.")
+        return redirect("recuperar_password")
+    
+    if not reset_token.is_valid():
+        messages.error(request, "Token expirado. Solicitá una nueva recuperación.")
+        return redirect("recuperar_password")
+    
+    if request.method == "POST":
+        nueva_password = (request.POST.get("nueva_password") or "").strip()
+        confirmar_password = (request.POST.get("confirmar_password") or "").strip()
+        
+        if not nueva_password:
+            messages.error(request, "Ingresá una nueva contraseña.")
+            return render(request, "resetear_password.html", {"token": token})
+        
+        if nueva_password != confirmar_password:
+            messages.error(request, "Las contraseñas no coinciden.")
+            return render(request, "resetear_password.html", {"token": token})
+        
+        if len(nueva_password) < 8:
+            messages.error(request, "La contraseña debe tener al menos 8 caracteres.")
+            return render(request, "resetear_password.html", {"token": token})
+        
+        user = reset_token.user
+        user.set_password(nueva_password)
+        user.save()
+        
+        reset_token.is_used = True
+        reset_token.save()
+        
+        messages.success(request, "Contraseña actualizada correctamente. Ya podés iniciar sesión.")
+        return redirect("login")
+    
+    return render(request, "resetear_password.html", {"token": token})
  
  
 @login_required

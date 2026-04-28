@@ -6,6 +6,7 @@ from .archivo_carga_masiva import ArchivoCargaMasiva
 from .usuario import Usuario
 from .notificacion import Notificacion
 from .operador import Operador
+from .password_reset_token import PasswordResetToken
 
 
-__all__ = ["Expediente", "BienPatrimonial", "ArchivoCargaMasiva", "Notificacion", "Usuario", "Operador"]
+__all__ = ["Expediente", "BienPatrimonial", "ArchivoCargaMasiva", "Notificacion", "Usuario", "Operador", "PasswordResetToken"]

@@ -13,6 +13,7 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     path('registro/', views.registro, name='registro'),
     path('recuperar-password/', views.recuperar_password, name='recuperar_password'),
+    path('resetear-contraseña/<str:token>/', views.resetear_password, name='resetear_password'),
 
     # Compatibilidad con /accounts/login/
     path('accounts/login/', RedirectView.as_view(pattern_name='login', permanent=False)),

@@ -101,3 +101,15 @@ LANGUAGE_CODE = 'es-ar'
 TIME_ZONE = 'America/Argentina/Buenos_Aires'
 USE_I18N = True
 USE_TZ = True
+
+# ==========================
+# EMAIL CONFIGURATION
+# ==========================
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'desposfrancisco@gmail.com'
+EMAIL_HOST_PASSWORD = 'your-app-password-here'  # Reemplaza con la App Password de Google
+DEFAULT_FROM_EMAIL = 'desposfrancisco@gmail.com'
+
