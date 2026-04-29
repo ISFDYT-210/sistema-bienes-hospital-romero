@@ -59,13 +59,35 @@ document.addEventListener('DOMContentLoaded', function() {
         // Si existe dropdown server-renderizado, agregar delegación para eliminar desde el dropdown
         const dropdown = document.getElementById('notificacionesDropdown') || wrapperNotificaciones.querySelector('.notificaciones-dropdown');
         if (dropdown) {
-            // delegación para eliminar notificaciones desde el dropdown
+            // delegación para acciones dentro del dropdown
             dropdown.addEventListener('click', function(ev) {
-                const btn = ev.target.closest('.btn-eliminar-notificacion');
-                if (!btn) return;
+                const btnBorrarTodas = ev.target.closest('.btn-borrar-todas');
+                if (btnBorrarTodas) {
+                    ev.stopPropagation();
+                    borrarTodasNotificaciones();
+                    return;
+                }
+
+                const btnMarcarTodas = ev.target.closest('.btn-marcar-todas');
+                if (btnMarcarTodas) {
+                    ev.stopPropagation();
+                    marcarTodasComoLeidas();
+                    return;
+                }
+
+                const btnMarcar = ev.target.closest('.btn-marcar-leido');
+                if (btnMarcar) {
+                    ev.stopPropagation();
+                    const id = btnMarcar.getAttribute('data-id');
+                    if (id) marcarComoLeido(id);
+                    return;
+                }
+
+                const btnEliminar = ev.target.closest('.btn-eliminar-notificacion');
+                if (!btnEliminar) return;
                 ev.stopPropagation();
-                const id = btn.getAttribute('data-id');
-                const li = btn.closest('.dropdown-notif-item');
+                const id = btnEliminar.getAttribute('data-id');
+                const li = btnEliminar.closest('.dropdown-notif-item');
                 const badge = wrapperNotificaciones.querySelector('.notificaciones-badge');
                 fetch(`/notificaciones/${id}/eliminar/`, {
                     method: 'POST',
@@ -146,32 +168,9 @@ document.addEventListener('DOMContentLoaded', function() {
             // Toggle dropdown visibility
             const isVisible = dropdown.style.display === 'block';
             dropdown.style.display = isVisible ? 'none' : 'block';
-
-            // Si abrimos el dropdown y hay badge > 0, marcar leídas en backend y ocultar badge
-            if (!isVisible) {
-                const badge = wrapperNotificaciones.querySelector('.notificaciones-badge');
-                if (badge && parseInt(badge.textContent) > 0) {
-                    fetch('/notificaciones/leidas/', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': getCookie('csrftoken') || ''
-                        },
-                        body: '{}'
-                    }).then(function(resp) {
-                        if (resp.ok) {
-                            if (badge) badge.style.display = 'none';
-                        }
-                    }).catch(function() {
-                        // ignore network errors for read-mark
-                    });
-                }
-            }
-
             return;
         }
 
-        // Si no hay dropdown, creamos el modal (el comportamiento anterior)
         const modal = document.createElement('div');
         modal.className = 'notificaciones-modal';
         modal.style.display = 'flex';
@@ -296,7 +295,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function eliminarNotificacion(id, element) {
-        // Llamada al backend para persistir la eliminación
         fetch(`/notificaciones/${id}/eliminar/`, {
             method: 'POST',
             headers: {
@@ -310,19 +308,73 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (idx !== -1) notificaciones.splice(idx, 1);
                 if (element && element.parentNode) element.parentNode.removeChild(element);
                 actualizarBadge();
-                mostrarMensaje('Notificación eliminada', 'info');
-            } else {
-                mostrarMensaje('No se pudo eliminar la notificación en el servidor', 'error');
+            }
+        }).catch(err => console.error(err));
+    }
+
+    function marcarTodasComoLeidas() {
+        fetch('/notificaciones/leidas/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken') || ''
+            },
+            body: '{}'
+        }).then(resp => {
+            if (resp.ok) {
+                const dropdown = document.getElementById('notificacionesDropdown') || wrapperNotificaciones.querySelector('.notificaciones-dropdown');
+                if (dropdown) {
+                    dropdown.querySelectorAll('.dropdown-notif-item[data-leida="0"]').forEach(li => {
+                        li.setAttribute('data-leida', '1');
+                        li.classList.remove('notificacion-no-leida');
+                        const actionBtn = li.querySelector('.btn-marcar-leido');
+                        if (actionBtn) actionBtn.remove();
+                    });
+                }
+                actualizarBadge();
             }
         }).catch(err => {
             console.error(err);
-            mostrarMensaje('Error de red al eliminar notificación', 'error');
+        });
+    }
+
+    function borrarTodasNotificaciones() {
+        if (!confirm('¿Estás seguro de que quieres borrar todas las notificaciones? Esta acción no se puede deshacer.')) {
+            return;
+        }
+        fetch('/notificaciones/borrar-todas/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken') || ''
+            },
+            body: '{}'
+        }).then(resp => {
+            if (resp.ok) {
+                const dropdown = document.getElementById('notificacionesDropdown') || wrapperNotificaciones.querySelector('.notificaciones-dropdown');
+                if (dropdown) {
+                    const list = dropdown.querySelector('.dropdown-list');
+                    if (list) {
+                        list.innerHTML = `
+                            <li style="text-align:center; padding:20px; color:#999; list-style:none;">
+                                <i class="fa-solid fa-bell-slash" style="font-size:24px; display:block; margin-bottom:8px;"></i>
+                                <p style="margin:0; font-size:13px;">Sin notificaciones</p>
+                            </li>
+                        `;
+                    }
+                }
+                actualizarBadge();
+            } else {
+                alert('No se pudieron borrar las notificaciones.');
+            }
+        }).catch(err => {
+            console.error(err);
+            alert('Error al conectar con el servidor.');
         });
     }
 
     // Funciones de manejo de notificaciones
     function marcarComoLeido(id) {
-        // Intentar marcar en backend primero (si existe), luego actualizar UI
         fetch(`/notificaciones/${id}/marcar-leida/`, {
             method: 'POST',
             headers: {
@@ -332,49 +384,32 @@ document.addEventListener('DOMContentLoaded', function() {
             body: '{}'
         }).then(resp => {
             if (resp.ok) {
-                // Actualizar array cliente si aplica
                 const notificacion = notificaciones.find(notif => notif.id == id);
                 if (notificacion) notificacion.leida = true;
 
-                // Si hay dropdown renderizado, actualizar atributo/data y clases
                 const dropdown = document.getElementById('notificacionesDropdown') || wrapperNotificaciones.querySelector('.notificaciones-dropdown');
                 if (dropdown) {
                     const li = dropdown.querySelector(`.dropdown-notif-item[data-id="${id}"]`);
                     if (li) {
                         li.setAttribute('data-leida', '1');
                         li.classList.remove('notificacion-no-leida');
+                        const actionBtn = li.querySelector('.btn-marcar-leido');
+                        if (actionBtn) actionBtn.remove();
                     }
                 }
-
                 actualizarBadge();
-                mostrarMensaje('Notificación marcada como leída', 'success');
-            } else {
-                mostrarMensaje('No se pudo marcar la notificación como leída', 'error');
             }
-        }).catch(err => {
-            console.error(err);
-            mostrarMensaje('Error de red al marcar notificación', 'error');
-        });
+        }).catch(err => console.error(err));
     }
 
     function manejarAceptar(id) {
         const notificacion = notificaciones.find(notif => notif.id == id);
-        if (notificacion) {
-            // Aquí iría la lógica para aceptar la solicitud
-            console.log('Aceptando notificación:', notificacion);
-            marcarComoLeido(id);
-            mostrarMensaje('Solicitud aceptada correctamente', 'success');
-        }
+        if (notificacion) marcarComoLeido(id);
     }
 
     function manejarRechazar(id) {
         const notificacion = notificaciones.find(notif => notif.id == id);
-        if (notificacion) {
-            // Aquí iría la lógica para rechazar la solicitud
-            console.log('Rechazando notificación:', notificacion);
-            marcarComoLeido(id);
-            mostrarMensaje('Solicitud rechazada', 'info');
-        }
+        if (notificacion) marcarComoLeido(id);
     }
 
     function cerrarModal(modal) {
@@ -386,12 +421,20 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 300);
     }
 
-    function mostrarMensaje(mensaje, tipo) {
-        // Puedes usar la misma función de mensajes que en operadores.js
-        console.log(mensaje, tipo);
-        // Temporal - puedes reemplazar con tu sistema de mensajes
-        alert(mensaje);
-    }
+    // Función desactivada intencionalmente — no mostrar mensajes de notificaciones
+    function mostrarMensaje(mensaje, tipo) { /* no-op */ }
+
+    window.mostrarMensaje = mostrarMensaje;
+    window.__processPopupMessages = function() {
+        if (!window.__pendingPopupMessages || !window.__pendingPopupMessages.length) return;
+        window.__pendingPopupMessages.forEach(function(item) {
+            if (item && item.text) {
+                mostrarMensaje(item.text, item.type || 'info');
+            }
+        });
+        window.__pendingPopupMessages.length = 0;
+    };
+    window.__processPopupMessages();
 
     // Inicializar
     inicializarNotificaciones();

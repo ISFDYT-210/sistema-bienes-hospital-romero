@@ -87,6 +87,7 @@
                     <th>Estado</th>
                     <th>Servicios</th>
                     <th>Observaciones</th>
+                    <th>SIEM</th>
                     <th>Precio</th>
                     <th>Fecha Alta</th>
                     <th>Acciones</th>
@@ -100,7 +101,15 @@
                     <td style="min-width:260px;">{{ b.descripcion }}</td>
                     <td class="text-center">{{ b.cantidad }}</td>
                     <td class="text-nowrap">{{ b.expediente.numero_expediente|default:"—" }}</td>
-                    <td class="text-nowrap">{{ b.expediente.numero_compra|default:"—" }}</td>
+                    <td class="text-nowrap">
+                      {% if b.numero_compra %}
+                        {{ b.numero_compra }}
+                      {% elif b.expediente.numero_compra %}
+                        {{ b.expediente.numero_compra }}
+                      {% else %}
+                        —
+                      {% endif %}
+                    </td>
                     <td class="text-nowrap">{{ b.cuenta_codigo|default:"—" }}</td>
                     <td class="text-nowrap">{{ b.nomenclatura_bienes|default:"—" }}</td>
                     <td class="text-nowrap">{{ b.numero_serie|default:"—" }}</td>
@@ -140,6 +149,7 @@
                     </td>
                     <td class="text-nowrap">{{ b.servicios|default:"—" }}</td>
                     <td style="min-width:220px;">{{ b.observaciones|default:"—" }}</td>
+                    <td class="text-nowrap">{% if b.siem %}{{ b.siem|date:"d/m/Y" }}{% else %}—{% endif %}</td>
                     <td class="text-end">
                         {% if b.valor_adquisicion %}
                             ${{ b.valor_adquisicion|floatformat:0|intcomma }}

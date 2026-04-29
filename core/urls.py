@@ -1,14 +1,14 @@
 from django.urls import path
 from django.views.generic import RedirectView
 from . import views
-from core.views import marcar_notificaciones_leidas
+from core.views import marcar_notificaciones_leidas, borrar_todas_notificaciones
 
 urlpatterns = [
     # ===== Raíz del sitio =====
-    path('', RedirectView.as_view(pattern_name='inicio', permanent=False)),
+    path('', RedirectView.as_view(pattern_name='login', permanent=False)),
 
     # ===== Inicio / Auth =====
-    path('inicio/', views.inicio, name='inicio'),
+    path('inicio/', views.login_view, name='inicio'),
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
     path('registro/', views.registro, name='registro'),
@@ -20,6 +20,7 @@ urlpatterns = [
     # ===== Dashboards =====
     path('home_admin/', views.home_admin, name='home_admin'),
     path('home_operador/', views.home_operador, name='home_operador'),
+    path('home_supervisor/', views.home_supervisor, name='home_supervisor'),
 
     # ===== Operadores =====
     path('operadores/', views.operadores, name='operadores'),
@@ -57,6 +58,7 @@ urlpatterns = [
 
     # ===== Notificaciones =====
     path('notificaciones/leidas/', marcar_notificaciones_leidas, name='marcar_notificaciones_leidas'),
+    path('notificaciones/borrar-todas/', borrar_todas_notificaciones, name='borrar_todas_notificaciones'),
     path('notificaciones/<int:pk>/eliminar/', views.eliminar_notificacion, name='eliminar_notificacion'),
     path('notificaciones/<int:pk>/marcar-leida/', views.marcar_notificacion_leida, name='marcar_notificacion_leida'),
 ]
