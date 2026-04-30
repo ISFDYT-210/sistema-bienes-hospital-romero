@@ -1,4 +1,6 @@
 # core/forms.py
+import re
+
 from django import forms
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
@@ -159,7 +161,12 @@ class OperadorForm(forms.Form):
         initial='operador',
         label='Tipo de Usuario'
     )
-    password = forms.CharField(required=False, widget=forms.PasswordInput, label='Contraseña')
+    password = forms.CharField(
+        required=False,
+        widget=forms.PasswordInput,
+        label='Contraseña',
+        help_text='Debe tener al menos 8 caracteres, una mayúscula, un número y un carácter especial.'
+    )
 
     def __init__(self, *args, operador_pk=None, **kwargs):
         self.operador_pk = operador_pk
@@ -195,3 +202,27 @@ class OperadorForm(forms.Form):
         if operadores.exists():
             raise ValidationError('Ya existe un operador con ese email')
         return email
+
+    def clean_password(self):
+        password = (self.cleaned_data.get('password') or '').strip()
+        if not password:
+            return password
+
+        if len(password) < 8:
+            raise ValidationError('La contraseña debe tener al menos 8 caracteres.')
+        if not re.search(r'[A-Z]', password):
+            raise ValidationError('La contraseña debe incluir al menos una letra mayúscula.')
+        if not re.search(r'[a-z]', password):
+            raise ValidationError('La contraseña debe incluir al menos una letra minúscula.')
+        if not re.search(r'\d', password):
+            raise ValidationError('La contraseña debe incluir al menos un número.')
+        if not re.search(r'[^A-Za-z0-9]', password):
+            raise ValidationError('La contraseña debe incluir al menos un carácter especial.')
+
+        from django.contrib.auth.password_validation import validate_password
+        try:
+            validate_password(password)
+        except ValidationError as e:
+            raise ValidationError(e.messages)
+
+        return password

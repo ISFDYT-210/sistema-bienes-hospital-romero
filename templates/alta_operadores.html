@@ -73,11 +73,16 @@
 
       <!-- Campo 'estado' removido según solicitud -->
 
-      <div class="form-group-item {% if form.password.errors %}campo-error{% endif %}">
+      <div class="form-group-item {% if form.password.errors or form.errors.password %}campo-error{% endif %}">
         <label for="password">Contraseña:</label>
         <input type="password" id="password" name="password" placeholder="....." required
                value="{{ form.password.value|default:'' }}">
-        <small class="text-error" id="error-password">{% if form.password.errors %}{{ form.password.errors.0 }}{% endif %}</small>
+        {% if form.password.help_text %}
+          <small class="form-text text-muted">{{ form.password.help_text }}</small>
+        {% endif %}
+        {% if form.password.errors %}
+          <small class="text-error">{{ form.password.errors.0 }}</small>
+        {% endif %}
       </div>
     </div>
 
@@ -169,4 +174,10 @@ document.addEventListener('DOMContentLoaded', function() {
     checkFormValidity();
 });
 </script>
+
+{% if messages %}
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+  {% endfor %}
+{% endif %}
 {% endblock %}

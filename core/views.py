@@ -30,6 +30,9 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 import io
 from xml.sax.saxutils import escape
 from core.models import Usuario
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
+
  
 def _role_route_name(user) -> str:
     """Devuelve el nombre de la ruta según el rol del usuario."""
@@ -342,7 +345,18 @@ def recuperar_password(request):
             email_subject = "Recupera tu contraseña - Sistema Patrimonio Hospital"
             email_body = f"""
 Hola {admin.username},
-
+        if password:
+                    try:
+                        # Esto corre tu ComplexPasswordValidator y los nativos de Django
+                        validate_password(password)
+                    except ValidationError as e:
+                        for error in e.messages:
+                            messages.error(request, error)
+                        return render(
+                            request,
+                            "alta_operadores.html",
+                            {"usar_operador_model": False, "form": form},
+                        )
 Recibimos una solicitud para recuperar tu contraseña de administrador.
 
 Haz clic en el siguiente enlace para resetearla (válido por 24 horas):
@@ -452,7 +466,7 @@ def alta_operadores(request):
         email = (request.POST.get("email") or "").strip()
         estado = (request.POST.get("estado") or "habilitado").strip()
         password = (request.POST.get("password") or "").strip()
- 
+        
         form = OperadorForm(request.POST)
         if not form.is_valid():
             messages.error(request, "Por favor, revisá los errores en el formulario.")

@@ -38,6 +38,28 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+# settings.py
+
+AUTH_PASSWORD_VALIDATORS = [
+    # ... los que ya estén ...
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'OPTIONS': {'min_length': 8},
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
+    # AGREGÁ ESTA LÍNEA (ajustá "nombre_de_tu_app" al nombre real):
+    {
+        'NAME': 'core.validators.ComplexPasswordValidator',
+    },
+]
 
 # ==========================
 # URLS / WSGI
