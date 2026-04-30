@@ -1535,6 +1535,9 @@ def eliminar_bien_definitivo(request, pk):
     return redirect("lista_baja_bienes")
 
 
+ 
+ 
+
 # ============================
 # NOTIFICACIONES
 # ============================
