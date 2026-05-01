@@ -816,11 +816,25 @@ def agregar_servicio(request):
 
     if request.method == "POST":
         nombre = (request.POST.get("nombre") or "").strip()
+        SERVICIOS_FIJOS = [
+            "Direccion Asociada Area Tecnica", "SAP (Servicio de Area Programatica y Redes de Salud)",
+            "Departamento Sistema de Informacion - SAMO Turnos y Estadistica", "Epidemiologia",
+            "Jardin Maternal", "Recuperacion Clinica", "Farmacia", "Direccion Asociada Medico Quirurgica",
+            "Percial", "Cirugia", "Hemoterapia", "Clinica", "Patologia", "Toxicologia",
+            "Esterilizacion", "Neuropsicologia", "Seguridad e Higiene", "U.T.I.",
+            "Area Limpieza Hospitalaria", "Emergencia", "Podologia y Peluqueria", "Infectologia",
+            "Odontologia", "Consultorios", "Cardiologia", "Gerenciamiento de Camas", "Neurologia",
+            "Gastroenterologia", "Rehabilitacion Fisica y Kinesiologia", "Neonatologia", "Laboratorio",
+            "Sala Gestion de Usuarios", "Diagnostico por Imagenes", "Reumatologia y Oftalmologia",
+            "Costurero", "CAPER", "Quirofano", "Consejeria", "Traumatologia", "Vacunacion",
+            "Pediatria y Neonatologia", "Dermatologia", "Tocoginecologia", "Oncologia",
+        ]
+        ya_existe_fijo = any(nombre.lower() == s.lower() for s in SERVICIOS_FIJOS)
+        ya_existe_extra = ServicioExtra.objects.filter(nombre__iexact=nombre).exists()
+
         if not nombre:
             messages.error(request, "El nombre no puede estar vacío.")
-        elif any(c.isdigit() for c in nombre):
-            messages.error(request, "El nombre no puede contener números.")
-        elif ServicioExtra.objects.filter(nombre__iexact=nombre).exists():
+        elif ya_existe_fijo or ya_existe_extra:
             messages.error(request, f"El servicio '{nombre}' ya existe.")
         else:
             ServicioExtra.objects.create(nombre=nombre)
@@ -831,7 +845,7 @@ def agregar_servicio(request):
     ctx = perms
     ctx.update({"servicios": servicios})
     return render(request, "agregar_servicio.html", ctx)
- 
+
 @login_required
 def reportes_view(request):
     scope = (request.GET.get("scope") or "24h").lower()
@@ -1275,7 +1289,11 @@ def editar_bien(request, pk):
         form = BienPatrimonialForm(instance=bien)
  
     context = permisos_context(request.user)
-    context.update({"form": form, "bien": bien})
+    context.update({
+        "form": form,
+        "bien": bien,
+        "servicios_extra": ServicioExtra.objects.all(),
+    })
     return render(request, "bienes/editar_bien.html", context)
  
  

@@ -134,9 +134,58 @@ def __init__(self, *args, **kwargs):
 
 # Agregar servicios extra al desplegable
         from core.models.servicio_extra import ServicioExtra
-        extras = list(ServicioExtra.objects.values_list("nombre", "nombre"))
-        opciones_base = list(self.fields["servicios"].widget.choices)
-        self.fields["servicios"].widget.choices = opciones_base + extras
+        SERVICIOS_FIJOS = [
+            ('', '— Seleccionar servicio —'),
+            ('Direccion Asociada Area Tecnica', 'Direccion Asociada Area Tecnica'),
+            ('SAP (Servicio de Area Programatica y Redes de Salud)', 'SAP (Servicio de Area Programatica y Redes de Salud)'),
+            ('Departamento Sistema de Informacion - SAMO Turnos y Estadistica', 'Departamento Sistema de Informacion - SAMO Turnos y Estadistica'),
+            ('Epidemiologia', 'Epidemiologia'),
+            ('Jardin Maternal', 'Jardin Maternal'),
+            ('Recuperacion Clinica', 'Recuperacion Clinica'),
+            ('Farmacia', 'Farmacia'),
+            ('Direccion Asociada Medico Quirurgica', 'Direccion Asociada Medico Quirurgica'),
+            ('Percial', 'Percial'),
+            ('Cirugia', 'Cirugia'),
+            ('Hemoterapia', 'Hemoterapia'),
+            ('Clinica', 'Clinica'),
+            ('Patologia', 'Patologia'),
+            ('Toxicologia', 'Toxicologia'),
+            ('Esterilizacion', 'Esterilizacion'),
+            ('Neuropsicologia', 'Neuropsicologia'),
+            ('Seguridad e Higiene', 'Seguridad e Higiene'),
+            ('U.T.I.', 'U.T.I.'),
+            ('Area Limpieza Hospitalaria', 'Area Limpieza Hospitalaria'),
+            ('Emergencia', 'Emergencia'),
+            ('Podologia y Peluqueria', 'Podologia y Peluqueria'),
+            ('Infectologia', 'Infectologia'),
+            ('Odontologia', 'Odontologia'),
+            ('Consultorios', 'Consultorios'),
+            ('Cardiologia', 'Cardiologia'),
+            ('Gerenciamiento de Camas', 'Gerenciamiento de Camas'),
+            ('Neurologia', 'Neurologia'),
+            ('Gastroenterologia', 'Gastroenterologia'),
+            ('Rehabilitacion Fisica y Kinesiologia', 'Rehabilitacion Fisica y Kinesiologia'),
+            ('Neonatologia', 'Neonatologia'),
+            ('Laboratorio', 'Laboratorio'),
+            ('Sala Gestion de Usuarios', 'Sala Gestion de Usuarios'),
+            ('Diagnostico por Imagenes', 'Diagnostico por Imagenes'),
+            ('Reumatologia y Oftalmologia', 'Reumatologia y Oftalmologia'),
+            ('Costurero', 'Costurero'),
+            ('CAPER', 'CAPER'),
+            ('Quirofano', 'Quirofano'),
+            ('Consejeria', 'Consejeria'),
+            ('Traumatologia', 'Traumatologia'),
+            ('Vacunacion', 'Vacunacion'),
+            ('Pediatria y Neonatologia', 'Pediatria y Neonatologia'),
+            ('Dermatologia', 'Dermatologia'),
+            ('Tocoginecologia', 'Tocoginecologia'),
+            ('Oncologia', 'Oncologia'),
+        ]
+        extras = [(s.nombre, s.nombre) for s in ServicioExtra.objects.all()]
+        self.fields["servicios"].widget = forms.Select(
+            choices=SERVICIOS_FIJOS + extras,
+            attrs={'class': 'form-select'}
+        )
 
 def clean(self):
     cleaned = super().clean()
