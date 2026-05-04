@@ -8,7 +8,6 @@ from core.models.expediente import Expediente
 from datetime import date
 
 
-
 class MultipleFileInput(forms.ClearableFileInput):
     allow_multiple_selected = True
 
@@ -20,10 +19,9 @@ class MultipleFileField(forms.FileField):
     def clean(self, data, initial=None):
         single_file_clean = super().clean
         if isinstance(data, (list, tuple)):
-            result = [single_file_clean(d, initial) for d in data]
-        else:
-            result = single_file_clean(data, initial)
-        return result
+            return [single_file_clean(d, initial) for d in data]
+        return single_file_clean(data, initial)
+
 
 # ========== FORMULARIO DE CARGA MASIVA ==========
 class CargaMasivaForm(forms.Form):
@@ -35,14 +33,13 @@ class CargaMasivaForm(forms.Form):
         max_length=100,
         required=False,
         label='Servicio por defecto (opcional)',
-        help_text='Si se deja vacío, se tomará el servicio de cada fila del archivo. Si el archivo se llama "RELEVAMIENTO...", se asignará automáticamente.',
+        help_text='Si se deja vacío, se tomará el servicio de cada fila del archivo.',
         widget=forms.TextInput(attrs={'class': 'form-control'})
     )
 
 
 # ========== FORMULARIO DE BIENES PATRIMONIALES ==========
 class BienPatrimonialForm(forms.ModelForm):
-    # Campos “ampliables” (no pertenecen al modelo del bien)
     numero_expediente = forms.CharField(label="N° de Expediente", max_length=50, required=False)
     numero_compra     = forms.CharField(label="N° de Compra",     max_length=50, required=False)
 
@@ -63,185 +60,130 @@ class BienPatrimonialForm(forms.ModelForm):
             'numero_identificacion': forms.TextInput(attrs={'class': 'form-control'}),
             'origen': forms.Select(attrs={'class': 'form-select'}),
             'estado': forms.Select(attrs={'class': 'form-select'}),
-            'servicios': forms.Select(choices=[
-    ('', '— Seleccionar servicio —'),
-    ('Direccion Asociada Area Tecnica', 'Direccion Asociada Area Tecnica'),
-    ('SAP (Servicio de Area Programatica y Redes de Salud)', 'SAP (Servicio de Area Programatica y Redes de Salud)'),
-    ('Departamento Sistema de Informacion - SAMO Turnos y Estadistica', 'Departamento Sistema de Informacion - SAMO Turnos y Estadistica'),
-    ('Epidemiologia', 'Epidemiologia'),
-    ('Jardin Maternal', 'Jardin Maternal'),
-    ('Recuperacion Clinica', 'Recuperacion Clinica'),
-    ('Farmacia', 'Farmacia'),
-    ('Direccion Asociada Medico Quirurgica', 'Direccion Asociada Medico Quirurgica'),
-    ('Percial', 'Percial'),
-    ('Cirugia', 'Cirugia'),
-    ('Hemoterapia', 'Hemoterapia'),
-    ('Clinica', 'Clinica'),
-    ('Patologia', 'Patologia'),
-    ('Toxicologia', 'Toxicologia'),
-    ('Esterilizacion', 'Esterilizacion'),
-    ('Neuropsicologia', 'Neuropsicologia'),
-    ('Seguridad e Higiene', 'Seguridad e Higiene'),
-    ('U.T.I.', 'U.T.I.'),
-    ('Area Limpieza Hospitalaria', 'Area Limpieza Hospitalaria'),
-    ('Emergencia', 'Emergencia'),
-    ('Podologia y Peluqueria', 'Podologia y Peluqueria'),
-    ('Infectologia', 'Infectologia'),
-    ('Odontologia', 'Odontologia'),
-    ('Consultorios', 'Consultorios'),
-    ('Cardiologia', 'Cardiologia'),
-    ('Gerenciamiento de Camas', 'Gerenciamiento de Camas'),
-    ('Neurologia', 'Neurologia'),
-    ('Gastroenterologia', 'Gastroenterologia'),
-    ('Rehabilitacion Fisica y Kinesiologia', 'Rehabilitacion Fisica y Kinesiologia'),
-    ('Neonatologia', 'Neonatologia'),
-    ('Laboratorio', 'Laboratorio'),
-    ('Sala Gestion de Usuarios', 'Sala Gestion de Usuarios'),
-    ('Diagnostico por Imagenes', 'Diagnostico por Imagenes'),
-    ('Reumatologia y Oftalmologia', 'Reumatologia y Oftalmologia'),
-    ('Costurero', 'Costurero'),
-    ('CAPER', 'CAPER'),
-    ('Quirofano', 'Quirofano'),
-    ('Consejeria', 'Consejeria'),
-    ('Traumatologia', 'Traumatologia'),
-    ('Vacunacion', 'Vacunacion'),
-    ('Pediatria y Neonatologia', 'Pediatria y Neonatologia'),
-    ('Dermatologia', 'Dermatologia'),
-    ('Tocoginecologia', 'Tocoginecologia'),
-    ('Oncologia', 'Oncologia'),
-    
-], attrs={'class': 'form-select'}),
+            'servicios': forms.Select(attrs={'class': 'form-select'}),
             'observaciones': forms.Textarea(attrs={'rows': 2, 'class': 'form-control'}),
             'valor_adquisicion': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': 0}),
             'fecha_adquisicion': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'fecha_baja': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
         }
 
-def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Estilo a los campos nuevos
         self.fields["numero_expediente"].widget.attrs.setdefault("class", "form-control")
         self.fields["numero_compra"].widget.attrs.setdefault("class", "form-control")
         self.fields["numero_expediente"].widget.attrs.setdefault("placeholder", "Ej: EX-123/2025")
         self.fields["numero_compra"].widget.attrs.setdefault("placeholder", "Ej: OC-45/2025")
 
-        # Precargar si el bien ya tiene expediente
         exp = getattr(self.instance, "expediente", None)
         if exp:
             self.fields["numero_expediente"].initial = exp.numero_expediente
             self.fields["numero_compra"].initial = exp.numero_compra
 
-# Agregar servicios extra al desplegable
+        # ===== SERVICIOS: fijos + extras, ordenados alfabéticamente =====
         from core.models.servicio_extra import ServicioExtra
+
         SERVICIOS_FIJOS = [
-            ('', '— Seleccionar servicio —'),
-            ('Direccion Asociada Area Tecnica', 'Direccion Asociada Area Tecnica'),
-            ('SAP (Servicio de Area Programatica y Redes de Salud)', 'SAP (Servicio de Area Programatica y Redes de Salud)'),
-            ('Departamento Sistema de Informacion - SAMO Turnos y Estadistica', 'Departamento Sistema de Informacion - SAMO Turnos y Estadistica'),
-            ('Epidemiologia', 'Epidemiologia'),
-            ('Jardin Maternal', 'Jardin Maternal'),
-            ('Recuperacion Clinica', 'Recuperacion Clinica'),
-            ('Farmacia', 'Farmacia'),
-            ('Direccion Asociada Medico Quirurgica', 'Direccion Asociada Medico Quirurgica'),
-            ('Percial', 'Percial'),
-            ('Cirugia', 'Cirugia'),
-            ('Hemoterapia', 'Hemoterapia'),
-            ('Clinica', 'Clinica'),
-            ('Patologia', 'Patologia'),
-            ('Toxicologia', 'Toxicologia'),
-            ('Esterilizacion', 'Esterilizacion'),
-            ('Neuropsicologia', 'Neuropsicologia'),
-            ('Seguridad e Higiene', 'Seguridad e Higiene'),
-            ('U.T.I.', 'U.T.I.'),
-            ('Area Limpieza Hospitalaria', 'Area Limpieza Hospitalaria'),
-            ('Emergencia', 'Emergencia'),
-            ('Podologia y Peluqueria', 'Podologia y Peluqueria'),
-            ('Infectologia', 'Infectologia'),
-            ('Odontologia', 'Odontologia'),
-            ('Consultorios', 'Consultorios'),
-            ('Cardiologia', 'Cardiologia'),
-            ('Gerenciamiento de Camas', 'Gerenciamiento de Camas'),
-            ('Neurologia', 'Neurologia'),
-            ('Gastroenterologia', 'Gastroenterologia'),
-            ('Rehabilitacion Fisica y Kinesiologia', 'Rehabilitacion Fisica y Kinesiologia'),
-            ('Neonatologia', 'Neonatologia'),
-            ('Laboratorio', 'Laboratorio'),
-            ('Sala Gestion de Usuarios', 'Sala Gestion de Usuarios'),
-            ('Diagnostico por Imagenes', 'Diagnostico por Imagenes'),
-            ('Reumatologia y Oftalmologia', 'Reumatologia y Oftalmologia'),
-            ('Costurero', 'Costurero'),
-            ('CAPER', 'CAPER'),
-            ('Quirofano', 'Quirofano'),
-            ('Consejeria', 'Consejeria'),
-            ('Traumatologia', 'Traumatologia'),
-            ('Vacunacion', 'Vacunacion'),
-            ('Pediatria y Neonatologia', 'Pediatria y Neonatologia'),
-            ('Dermatologia', 'Dermatologia'),
-            ('Tocoginecologia', 'Tocoginecologia'),
-            ('Oncologia', 'Oncologia'),
+            'Area Limpieza Hospitalaria',
+            'CAPER',
+            'Cardiologia',
+            'Cirugia',
+            'Clinica',
+            'Consejeria',
+            'Consultorios',
+            'Departamento Sistema De Informacion - Samo Turnos Y Estadistica',
+            'Dermatologia',
+            'Diagnostico Por Imagenes',
+            'Direccion Asociada Area Tecnica',
+            'Direccion Asociada Medico Quirurgica',
+            'Emergencia',
+            'Epidemiologia',
+            'Esterilizacion',
+            'Farmacia',
+            'Gastroenterologia',
+            'Gerenciamiento De Camas',
+            'Hemoterapia',
+            'Infectologia',
+            'Jardin Maternal',
+            'Laboratorio',
+            'Neonatologia',
+            'Neurologia',
+            'Neuropsicologia',
+            'Odontologia',
+            'Oncologia',
+            'Patologia',
+            'Pediatria Y Neonatologia',
+            'Percial',
+            'Podologia Y Peluqueria',
+            'Quirofano',
+            'Recuperacion Clinica',
+            'Rehabilitacion Fisica Y Kinesiologia',
+            'Reumatologia Y Oftalmologia',
+            'SAP (Servicio De Area Programatica Y Redes De Salud)',
+            'Sala Gestion De Usuarios',
+            'Seguridad E Higiene',
+            'Tocoginecologia',
+            'Toxicologia',
+            'Traumatologia',
+            'U.T.I.',
+            'Vacunacion',
         ]
-        extras = [(s.nombre, s.nombre) for s in ServicioExtra.objects.all()]
-        self.fields["servicios"].widget = forms.Select(
-            choices=SERVICIOS_FIJOS + extras,
-            attrs={'class': 'form-select'}
-        )
 
-def clean(self):
-    cleaned = super().clean()
+        extras = [s.nombre for s in ServicioExtra.objects.all()]
+        todos = sorted(set(SERVICIOS_FIJOS + extras))
+        choices = [('', '— Seleccionar servicio —')] + [(s, s) for s in todos]
+        self.fields["servicios"].widget.choices = choices
+        
+    def clean_servicios(self):
+        return self.cleaned_data.get("servicios") or ""
+    
+    def clean(self):
+        cleaned = super().clean()
 
-    n_exp = (cleaned.get("numero_expediente") or "").strip()
-    n_cmp = (cleaned.get("numero_compra") or "").strip()
+        n_exp = (cleaned.get("numero_expediente") or "").strip()
+        n_cmp = (cleaned.get("numero_compra") or "").strip()
 
-    # Si informan N° de compra, exigir N° de expediente
-    if n_cmp and not n_exp:
-        self.add_error("numero_expediente", "Si informás N° de compra, debés indicar el N° de Expediente.")
+        if n_cmp and not n_exp:
+            self.add_error("numero_expediente", "Si informás N° de compra, debés indicar el N° de Expediente.")
 
-    # Precio: si el origen no es COMPRA, ignorar precio
-    if cleaned.get("origen") and cleaned["origen"] != "COMPRA":
-        cleaned["valor_adquisicion"] = None
+        if cleaned.get("origen") and cleaned["origen"] != "COMPRA":
+            cleaned["valor_adquisicion"] = None
 
-    # --- Fecha de baja según estado ---
-    estado = cleaned.get("estado")
-    fecha_baja = cleaned.get("fecha_baja")
+        estado = cleaned.get("estado")
+        fecha_baja = cleaned.get("fecha_baja")
 
-    if estado == "BAJA":
-        # exigir fecha de baja si está en BAJA
-        if not fecha_baja:
-        # podés forzar obligatorio:
-        # self.add_error("fecha_baja", "Indicá la fecha de baja.")
-        # o autocompletar con hoy:
-            cleaned["fecha_baja"] = date.today()
-    else:
-        # si NO está en BAJA, limpiar fecha_baja
-        cleaned["fecha_baja"] = None
+        if estado == "BAJA":
+            if not fecha_baja:
+                cleaned["fecha_baja"] = date.today()
+        else:
+            cleaned["fecha_baja"] = None
 
-    return cleaned
+        return cleaned
 
-def save(self, commit=True):
-    bien = super().save(commit=False)
+    def save(self, commit=True):
+        bien = super().save(commit=False)
 
-    n_exp = (self.cleaned_data.get("numero_expediente") or "").strip()
-    n_cmp = (self.cleaned_data.get("numero_compra") or "").strip()
+        n_exp = (self.cleaned_data.get("numero_expediente") or "").strip()
+        n_cmp = (self.cleaned_data.get("numero_compra") or "").strip()
 
-    expediente = None
-    if n_exp:
-        expediente, _ = Expediente.objects.get_or_create(numero_expediente=n_exp)
-        if n_cmp and expediente.numero_compra != n_cmp:
-            expediente.numero_compra = n_cmp
-            expediente.save()
-    else:
-        # usar lo elegido en el select, si hay
-        expediente = self.cleaned_data.get("expediente")
+        expediente = None
+        if n_exp:
+            expediente, _ = Expediente.objects.get_or_create(numero_expediente=n_exp)
+            if n_cmp and expediente.numero_compra != n_cmp:
+                expediente.numero_compra = n_cmp
+                expediente.save()
+        else:
+            expediente = self.cleaned_data.get("expediente")
 
-    bien.expediente = expediente
+        bien.expediente = expediente
 
-    if commit:
-        bien.save()
-        self.save_m2m()
-    return bien
+        if commit:
+            bien.save()
+            self.save_m2m()
+        return bien
 
 
+# ========== FORMULARIO OPERADOR ==========
 class OperadorForm(forms.Form):
     nombre = forms.CharField(max_length=200, required=True, label='Nombre')
     apellido = forms.CharField(max_length=200, required=True, label='Apellido')
@@ -277,10 +219,8 @@ class OperadorForm(forms.Form):
         dni = (self.cleaned_data.get('dni') or '').strip()
         if not dni:
             return dni
-
         if not dni.isdigit() or len(dni) > 8:
             raise ValidationError('El DNI debe tener sólo números y hasta 8 dígitos.')
-
         Operador = get_user_model()
         operadores = Operador.objects.filter(numero_doc__iexact=dni)
         if self.operador_pk:
@@ -293,7 +233,6 @@ class OperadorForm(forms.Form):
         email = (self.cleaned_data.get('email') or '').strip()
         if not email:
             return email
-
         Operador = get_user_model()
         operadores = Operador.objects.filter(email__iexact=email)
         if self.operador_pk:

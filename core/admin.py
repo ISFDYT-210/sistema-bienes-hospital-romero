@@ -69,7 +69,6 @@ class BienPatrimonialAdmin(admin.ModelAdmin):
         'clave_unica',
         first_present(BienPatrimonial, ['nombre', 'descripcion']),
         'cantidad',
-        'servicios',
         'estado',
         'expediente',
         'origen',

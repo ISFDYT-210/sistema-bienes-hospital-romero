@@ -808,6 +808,48 @@ def reportes_pdf(request):
         return resp
  
 @login_required
+def agregar_servicio_ajax(request):
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "Método no permitido."}, status=405)
+
+    perms = permisos_context(request.user)
+    if not perms["es_admin"]:
+        return JsonResponse({"ok": False, "error": "Sin permisos."}, status=403)
+
+    import json
+    try:
+        data = json.loads(request.body)
+        nombre = (data.get("nombre") or "").strip().title()
+    except Exception:
+        return JsonResponse({"ok": False, "error": "Datos inválidos."}, status=400)
+
+    if not nombre:
+        return JsonResponse({"ok": False, "error": "El nombre no puede estar vacío."})
+
+    SERVICIOS_FIJOS = [
+        "Direccion Asociada Area Tecnica", "SAP (Servicio De Area Programatica Y Redes De Salud)",
+        "Departamento Sistema De Informacion - Samo Turnos Y Estadistica", "Epidemiologia",
+        "Jardin Maternal", "Recuperacion Clinica", "Farmacia", "Direccion Asociada Medico Quirurgica",
+        "Percial", "Cirugia", "Hemoterapia", "Clinica", "Patologia", "Toxicologia",
+        "Esterilizacion", "Neuropsicologia", "Seguridad E Higiene", "U.T.I.",
+        "Area Limpieza Hospitalaria", "Emergencia", "Podologia Y Peluqueria", "Infectologia",
+        "Odontologia", "Consultorios", "Cardiologia", "Gerenciamiento De Camas", "Neurologia",
+        "Gastroenterologia", "Rehabilitacion Fisica Y Kinesiologia", "Neonatologia", "Laboratorio",
+        "Sala Gestion De Usuarios", "Diagnostico Por Imagenes", "Reumatologia Y Oftalmologia",
+        "Costurero", "CAPER", "Quirofano", "Consejeria", "Traumatologia", "Vacunacion",
+        "Pediatria Y Neonatologia", "Dermatologia", "Tocoginecologia", "Oncologia",
+    ]
+
+    ya_existe_fijo = any(nombre.lower() == s.lower() for s in SERVICIOS_FIJOS)
+    ya_existe_extra = ServicioExtra.objects.filter(nombre__iexact=nombre).exists()
+
+    if ya_existe_fijo or ya_existe_extra:
+        return JsonResponse({"ok": False, "error": f"El servicio '{nombre}' ya existe."})
+
+    ServicioExtra.objects.create(nombre=nombre)
+    return JsonResponse({"ok": True, "nombre": nombre, "mensaje": f"Servicio '{nombre}' agregado correctamente."})
+ 
+@login_required
 def agregar_servicio(request):
     perms = permisos_context(request.user)
     if not perms["es_admin"]:
@@ -815,7 +857,7 @@ def agregar_servicio(request):
         return redirect("home_operador")
 
     if request.method == "POST":
-        nombre = (request.POST.get("nombre") or "").strip()
+        nombre = (request.POST.get("nombre") or "").strip().title()
         SERVICIOS_FIJOS = [
             "Direccion Asociada Area Tecnica", "SAP (Servicio de Area Programatica y Redes de Salud)",
             "Departamento Sistema de Informacion - SAMO Turnos y Estadistica", "Epidemiologia",
@@ -944,20 +986,37 @@ def reportes_view(request):
     qd.pop("page", None)
     querystring = qd.urlencode()
  
+    from core.models.servicio_extra import ServicioExtra
+    SERVICIOS_FIJOS = [
+        'Area Limpieza Hospitalaria', 'CAPER', 'Cardiologia', 'Cirugia', 'Clinica',
+        'Consejeria', 'Consultorios', 'Departamento Sistema De Informacion - Samo Turnos Y Estadistica',
+        'Dermatologia', 'Diagnostico Por Imagenes', 'Direccion Asociada Area Tecnica',
+        'Direccion Asociada Medico Quirurgica', 'Emergencia', 'Epidemiologia', 'Esterilizacion',
+        'Farmacia', 'Gastroenterologia', 'Gerenciamiento De Camas', 'Hemoterapia', 'Infectologia',
+        'Jardin Maternal', 'Laboratorio', 'Neonatologia', 'Neurologia', 'Neuropsicologia',
+        'Odontologia', 'Oncologia', 'Patologia', 'Pediatria Y Neonatologia', 'Percial',
+        'Podologia Y Peluqueria', 'Quirofano', 'Recuperacion Clinica',
+        'Rehabilitacion Fisica Y Kinesiologia', 'Reumatologia Y Oftalmologia',
+        'SAP (Servicio De Area Programatica Y Redes De Salud)', 'Sala Gestion De Usuarios',
+        'Seguridad E Higiene', 'Tocoginecologia', 'Toxicologia', 'Traumatologia', 'U.T.I.', 'Vacunacion',
+    ]
+    extras = list(ServicioExtra.objects.values_list('nombre', flat=True))
+    todos_servicios = sorted(set(SERVICIOS_FIJOS + extras))
+
     ctx = permisos_context(request.user)
     ctx.update({
-    "bienes": page_obj.object_list,
-    "scope": scope,
-    "servicios_seleccionados": servicios_seleccionados,
-    "servicios_extra": ServicioExtra.objects.all(),
-    "paginator": paginator,
-    "page_obj": page_obj,
-    "is_paginated": paginator.num_pages > 1,
-    "page_range": page_range,
-    "prev_page": prev_page,
-    "next_page": next_page,
-    "querystring": querystring,
-})
+        "bienes": page_obj.object_list,
+        "scope": scope,
+        "servicios_seleccionados": servicios_seleccionados,
+        "todos_servicios": todos_servicios,
+        "paginator": paginator,
+        "page_obj": page_obj,
+        "is_paginated": paginator.num_pages > 1,
+        "page_range": page_range,
+        "prev_page": prev_page,
+        "next_page": next_page,
+        "querystring": querystring,
+    })
 
     return render(request, "reportes.html", ctx)
  

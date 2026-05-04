@@ -76,15 +76,14 @@
               <div class="card card-body border border-primary bg-light">
                 <div class="row g-3">
                   <div class="col-md-6">
-                    <label class="form-label" for="{{ form.numero_expediente.id_for_label }}">N° de Expediente </label>
+                    <label class="form-label" for="{{ form.numero_expediente.id_for_label }}">N° de Expediente</label>
                     {{ form.numero_expediente }}
                     {% for e in form.numero_expediente.errors %}
                       <div class="invalid-feedback d-block">{{ e }}</div>
                     {% endfor %}
                   </div>
-
                   <div class="col-md-6">
-                    <label class="form-label" for="{{ form.numero_compra.id_for_label }}">N° de Compra    </label>
+                    <label class="form-label" for="{{ form.numero_compra.id_for_label }}">N° de Compra</label>
                     {{ form.numero_compra }}
                     {% for e in form.numero_compra.errors %}
                       <div class="invalid-feedback d-block">{{ e }}</div>
@@ -94,7 +93,6 @@
               </div>
             </div>
           </div>
-          <!-- FIN BLOQUE EXPEDIENTE -->
 
           <!-- Cuenta código / Nomenclatura -->
           <div class="col-md-3">
@@ -133,7 +131,18 @@
           </div>
           <div class="col-md-4">
             <label class="form-label" for="{{ form.servicios.id_for_label }}">Servicios / Sector</label>
-            {{ form.servicios }}
+            <div class="d-flex gap-2 align-items-center">
+              {{ form.servicios }}
+              {% if es_admin %}
+              <button type="button"
+                      class="btn d-flex align-items-center justify-content-center"
+                      style="background-color: #198754; border-color: #198754; color: white; width: 38px; height: 38px; flex-shrink: 0;"
+                      data-bs-toggle="modal" data-bs-target="#modalAgregarServicio"
+                      title="Agregar nuevo servicio">
+                <i class="fa-solid fa-plus" style="color: white; font-size: 14px;"></i>
+              </button>
+              {% endif %}
+            </div>
             {% for e in form.servicios.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
           </div>
 
@@ -158,7 +167,7 @@
             {% for e in form.fecha_adquisicion.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
           </div>
 
-          <!-- NUEVO: Fecha de Baja (oculta hasta que el estado sea BAJA) -->
+          <!-- Fecha de Baja (oculta hasta que el estado sea BAJA) -->
           <div class="col-md-4 d-none" id="grupo-fecha-baja">
             <label class="form-label" for="{{ form.fecha_baja.id_for_label }}">Fecha de Baja</label>
             {{ form.fecha_baja }}
@@ -179,12 +188,34 @@
     </div>
   </div>
 
+  {% if es_admin %}
+  <!-- Modal agregar servicio -->
+  <div class="modal fade" id="modalAgregarServicio" tabindex="-1" aria-labelledby="modalAgregarServicioLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalAgregarServicioLabel">Agregar nuevo servicio</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="modal-mensaje" class="mb-2" style="display:none;"></div>
+          <label class="form-label">Nombre del servicio</label>
+          <input type="text" id="input-nuevo-servicio" class="form-control" placeholder="Ej: Cardiologia Pediatrica">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-success" id="btn-guardar-servicio">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-  // Ocultar "Precio" si Origen ≠ COMPRA y mostrar "Fecha de Baja" si Estado = BAJA
   (function () {
     const origen = document.getElementById('id_origen');
     const grupoPrecio = document.getElementById('grupo-precio');
@@ -203,7 +234,6 @@
     togglePrecio();
     origen?.addEventListener('change', togglePrecio);
 
-    // === Mostrar Fecha de Baja si Estado = BAJA ===
     const estado = document.getElementById('id_estado');
     const grupoFechaBaja = document.getElementById('grupo-fecha-baja');
     const inputFechaBaja = document.getElementById('id_fecha_baja');
@@ -229,5 +259,61 @@
     toggleFechaBaja();
     estado?.addEventListener('change', toggleFechaBaja);
   })();
+
+  {% if es_admin %}
+  document.getElementById('btn-guardar-servicio').addEventListener('click', function() {
+    const nombre = document.getElementById('input-nuevo-servicio').value.trim();
+    const msgDiv = document.getElementById('modal-mensaje');
+
+    if (!nombre) {
+      msgDiv.style.display = 'block';
+      msgDiv.className = 'alert alert-warning';
+      msgDiv.textContent = 'El nombre no puede estar vacío.';
+      return;
+    }
+
+    fetch("{% url 'agregar_servicio_ajax' %}", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}'
+      },
+      body: JSON.stringify({nombre: nombre})
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        msgDiv.style.display = 'block';
+        msgDiv.className = 'alert alert-success';
+        msgDiv.textContent = data.mensaje;
+
+        const select = document.getElementById('id_servicios');
+        const option = new Option(data.nombre, data.nombre);
+
+        // Insertar en orden alfabético
+        let inserted = false;
+        for (let i = 1; i < select.options.length; i++) {
+          if (select.options[i].text.localeCompare(data.nombre) > 0) {
+            select.add(option, i);
+            inserted = true;
+            break;
+          }
+        }
+        if (!inserted) select.add(option);
+        select.value = data.nombre;
+
+        setTimeout(() => {
+          document.getElementById('input-nuevo-servicio').value = '';
+          msgDiv.style.display = 'none';
+          bootstrap.Modal.getInstance(document.getElementById('modalAgregarServicio')).hide();
+        }, 1200);
+      } else {
+        msgDiv.style.display = 'block';
+        msgDiv.className = 'alert alert-danger';
+        msgDiv.textContent = data.error;
+      }
+    });
+  });
+  {% endif %}
 </script>
 {% endblock %}

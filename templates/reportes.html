@@ -17,54 +17,10 @@
       <option value="all" {% if scope == 'all' %}selected{% endif %}>Historico</option>
     </select>
 
-    <!-- Desplegable de servicios con Select2 -->
+    <!-- Desplegable de servicios con Select2 - ordenado alfabéticamente -->
     <select name="servicio" id="filtro-servicio" class="form-select" style="min-width: 280px;" multiple>
-      <option value="Direccion Asociada Area Tecnica" {% if 'Direccion Asociada Area Tecnica' in servicios_seleccionados %}selected{% endif %}>Direccion Asociada Area Tecnica</option>
-      <option value="SAP (Servicio de Area Programatica y Redes de Salud)" {% if 'SAP (Servicio de Area Programatica y Redes de Salud)' in servicios_seleccionados %}selected{% endif %}>SAP (Servicio de Area Programatica y Redes de Salud)</option>
-      <option value="Departamento Sistema de Informacion - SAMO Turnos y Estadistica" {% if 'Departamento Sistema de Informacion - SAMO Turnos y Estadistica' in servicios_seleccionados %}selected{% endif %}>Departamento Sistema de Informacion - SAMO Turnos y Estadistica</option>
-      <option value="Epidemiologia" {% if 'Epidemiologia' in servicios_seleccionados %}selected{% endif %}>Epidemiologia</option>
-      <option value="Jardin Maternal" {% if 'Jardin Maternal' in servicios_seleccionados %}selected{% endif %}>Jardin Maternal</option>
-      <option value="Recuperacion Clinica" {% if 'Recuperacion Clinica' in servicios_seleccionados %}selected{% endif %}>Recuperacion Clinica</option>
-      <option value="Farmacia" {% if 'Farmacia' in servicios_seleccionados %}selected{% endif %}>Farmacia</option>
-      <option value="Direccion Asociada Medico Quirurgica" {% if 'Direccion Asociada Medico Quirurgica' in servicios_seleccionados %}selected{% endif %}>Direccion Asociada Medico Quirurgica</option>
-      <option value="Percial" {% if 'Percial' in servicios_seleccionados %}selected{% endif %}>Percial</option>
-      <option value="Cirugia" {% if 'Cirugia' in servicios_seleccionados %}selected{% endif %}>Cirugia</option>
-      <option value="Hemoterapia" {% if 'Hemoterapia' in servicios_seleccionados %}selected{% endif %}>Hemoterapia</option>
-      <option value="Clinica" {% if 'Clinica' in servicios_seleccionados %}selected{% endif %}>Clinica</option>
-      <option value="Patologia" {% if 'Patologia' in servicios_seleccionados %}selected{% endif %}>Patologia</option>
-      <option value="Toxicologia" {% if 'Toxicologia' in servicios_seleccionados %}selected{% endif %}>Toxicologia</option>
-      <option value="Esterilizacion" {% if 'Esterilizacion' in servicios_seleccionados %}selected{% endif %}>Esterilizacion</option>
-      <option value="Neuropsicologia" {% if 'Neuropsicologia' in servicios_seleccionados %}selected{% endif %}>Neuropsicologia</option>
-      <option value="Seguridad e Higiene" {% if 'Seguridad e Higiene' in servicios_seleccionados %}selected{% endif %}>Seguridad e Higiene</option>
-      <option value="U.T.I." {% if 'U.T.I.' in servicios_seleccionados %}selected{% endif %}>U.T.I.</option>
-      <option value="Area Limpieza Hospitalaria" {% if 'Area Limpieza Hospitalaria' in servicios_seleccionados %}selected{% endif %}>Area Limpieza Hospitalaria</option>
-      <option value="Emergencia" {% if 'Emergencia' in servicios_seleccionados %}selected{% endif %}>Emergencia</option>
-      <option value="Podologia y Peluqueria" {% if 'Podologia y Peluqueria' in servicios_seleccionados %}selected{% endif %}>Podologia y Peluqueria</option>
-      <option value="Infectologia" {% if 'Infectologia' in servicios_seleccionados %}selected{% endif %}>Infectologia</option>
-      <option value="Odontologia" {% if 'Odontologia' in servicios_seleccionados %}selected{% endif %}>Odontologia</option>
-      <option value="Consultorios" {% if 'Consultorios' in servicios_seleccionados %}selected{% endif %}>Consultorios</option>
-      <option value="Cardiologia" {% if 'Cardiologia' in servicios_seleccionados %}selected{% endif %}>Cardiologia</option>
-      <option value="Gerenciamiento de Camas" {% if 'Gerenciamiento de Camas' in servicios_seleccionados %}selected{% endif %}>Gerenciamiento de Camas</option>
-      <option value="Neurologia" {% if 'Neurologia' in servicios_seleccionados %}selected{% endif %}>Neurologia</option>
-      <option value="Gastroenterologia" {% if 'Gastroenterologia' in servicios_seleccionados %}selected{% endif %}>Gastroenterologia</option>
-      <option value="Rehabilitacion Fisica y Kinesiologia" {% if 'Rehabilitacion Fisica y Kinesiologia' in servicios_seleccionados %}selected{% endif %}>Rehabilitacion Fisica y Kinesiologia</option>
-      <option value="Neonatologia" {% if 'Neonatologia' in servicios_seleccionados %}selected{% endif %}>Neonatologia</option>
-      <option value="Laboratorio" {% if 'Laboratorio' in servicios_seleccionados %}selected{% endif %}>Laboratorio</option>
-      <option value="Sala Gestion de Usuarios" {% if 'Sala Gestion de Usuarios' in servicios_seleccionados %}selected{% endif %}>Sala Gestion de Usuarios</option>
-      <option value="Diagnostico por Imagenes" {% if 'Diagnostico por Imagenes' in servicios_seleccionados %}selected{% endif %}>Diagnostico por Imagenes</option>
-      <option value="Reumatologia y Oftalmologia" {% if 'Reumatologia y Oftalmologia' in servicios_seleccionados %}selected{% endif %}>Reumatologia y Oftalmologia</option>
-      <option value="Costurero" {% if 'Costurero' in servicios_seleccionados %}selected{% endif %}>Costurero</option>
-      <option value="CAPER" {% if 'CAPER' in servicios_seleccionados %}selected{% endif %}>CAPER</option>
-      <option value="Quirofano" {% if 'Quirofano' in servicios_seleccionados %}selected{% endif %}>Quirofano</option>
-      <option value="Consejeria" {% if 'Consejeria' in servicios_seleccionados %}selected{% endif %}>Consejeria</option>
-      <option value="Traumatologia" {% if 'Traumatologia' in servicios_seleccionados %}selected{% endif %}>Traumatologia</option>
-      <option value="Vacunacion" {% if 'Vacunacion' in servicios_seleccionados %}selected{% endif %}>Vacunacion</option>
-      <option value="Pediatria y Neonatologia" {% if 'Pediatria y Neonatologia' in servicios_seleccionados %}selected{% endif %}>Pediatria y Neonatologia</option>
-      <option value="Dermatologia" {% if 'Dermatologia' in servicios_seleccionados %}selected{% endif %}>Dermatologia</option>
-      <option value="Tocoginecologia" {% if 'Tocoginecologia' in servicios_seleccionados %}selected{% endif %}>Tocoginecologia</option>
-      <option value="Oncologia" {% if 'Oncologia' in servicios_seleccionados %}selected{% endif %}>Oncologia</option>
-      {% for s in servicios_extra %}
-      <option value="{{ s.nombre }}" {% if s.nombre in servicios_seleccionados %}selected{% endif %}>{{ s.nombre }}</option>
+      {% for s in todos_servicios %}
+      <option value="{{ s }}" {% if s in servicios_seleccionados %}selected{% endif %}>{{ s }}</option>
       {% endfor %}
     </select>
 
