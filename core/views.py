@@ -1733,6 +1733,51 @@ def dar_baja_bien(request, pk):
     )
     messages.success(request, f"Bien '{bien.nombre}' dado de baja correctamente.")
     return redirect("lista_bienes")
+
+
+@login_required
+@require_POST
+@transaction.atomic
+def dar_baja_bienes_seleccionados(request):
+    perms = permisos_context(request.user)
+    if not perms["es_admin"]:
+        messages.error(request, "No tienes permisos para dar de baja bienes.")
+        return redirect("lista_bienes")
+
+    pks = request.POST.getlist("bienes_seleccionados_baja")
+    if not pks:
+        messages.warning(request, "No se seleccionó ningún bien para dar de baja.")
+        return redirect("lista_bienes")
+
+    bienes = BienPatrimonial.objects.filter(pk__in=pks)
+    count = bienes.count()
+    if count == 0:
+        messages.warning(request, "No se encontraron los bienes seleccionados.")
+        return redirect("lista_bienes")
+
+    nombres_bienes = []
+    
+    for bien in bienes:
+        pk = str(bien.pk)
+        fecha_str = request.POST.get(f"fecha_baja_{pk}")
+        fecha_baja = parse_date(fecha_str or "") or date.today()
+        expediente_baja = (request.POST.get(f"expediente_baja_{pk}") or "").strip()
+        descripcion_baja = (request.POST.get(f"descripcion_baja_{pk}") or "").strip()
+
+        bien.estado = "BAJA"
+        bien.fecha_baja = fecha_baja
+        bien.expediente_baja = expediente_baja
+        bien.descripcion_baja = descripcion_baja
+        bien.save(update_fields=["estado", "fecha_baja", "expediente_baja", "descripcion_baja"])
+        
+        nombre = getattr(bien, "nombre", None) or getattr(bien, "descripcion", "Sin nombre")
+        nombres_bienes.append(nombre)
+
+    crear_notificacion_admins(
+        f"Se dieron de baja {count} bienes: {', '.join(nombres_bienes[:5])}{'...' if count > 5 else ''}."
+    )
+    messages.success(request, f"Se han dado de baja {count} bienes correctamente.")
+    return redirect("lista_bienes")
  
  
 @login_required

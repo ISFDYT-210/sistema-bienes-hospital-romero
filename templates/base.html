@@ -188,6 +188,16 @@
     </script>
     {% endif %}
 
+    <script>
+    // Limpiar selección masiva de bienes al salir de la lista principal
+    (function(){
+        // Si la URL actual no es la lista de bienes activos, limpiamos el localStorage
+        if (window.location.pathname !== '{% url "lista_bienes" %}') {
+            localStorage.removeItem('bienes_baja_seleccionados');
+        }
+    })();
+    </script>
+
     {% block extra_js %}{% endblock %}
 </body>
 </html>

@@ -39,6 +39,7 @@ urlpatterns = [
     path('bienes/<int:pk>/editar/', views.editar_bien, name='editar_bien'),
     path('bienes/<int:pk>/eliminar/', views.eliminar_bien, name='eliminar_bien'),
     path('bienes/eliminar-seleccionados/', views.eliminar_bienes_seleccionados, name='eliminar_bienes_seleccionados'),
+    path('bienes/bajas-seleccionados/', views.dar_baja_bienes_seleccionados, name='dar_baja_bienes_seleccionados'),
 
     # Listas
     path('lista-bienes/', views.lista_bienes, name='lista_bienes'),
