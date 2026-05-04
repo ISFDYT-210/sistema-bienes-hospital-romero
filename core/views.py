@@ -307,6 +307,7 @@ def alta_operadores(request):
  
         form = OperadorForm(request.POST)
         if not form.is_valid():
+            messages.error(request, "Por favor, revisá los errores en el formulario.")
             return render(
                 request,
                 "alta_operadores.html",
@@ -323,13 +324,14 @@ def alta_operadores(request):
  
         numero_doc = form.cleaned_data["dni"]
  
-        nombre     = (request.POST.get("nombre") or "").strip()
-        apellido   = (request.POST.get("apellido") or "").strip()
-        pais       = (request.POST.get("pais") or "").strip()
-        numero_doc = (request.POST.get("numero_doc") or "").strip()
-        email      = (request.POST.get("email") or "").strip()
+        # Usamos los datos validados del form en su lugar
+        numero_doc = form.cleaned_data.get("dni")
+        email      = form.cleaned_data.get("email")
+        nombre     = form.cleaned_data.get("nombre")
+        apellido   = form.cleaned_data.get("apellido")
+        pais       = form.cleaned_data.get("pais")
         estado     = (request.POST.get("estado") or "habilitado").strip()
-        password   = (request.POST.get("password") or "").strip()
+        password   = form.cleaned_data.get("password")
  
         # Validación DNI duplicado
         if numero_doc and Usuario.objects.filter(numero_doc=numero_doc).exists():
@@ -400,13 +402,15 @@ def alta_operadores(request):
                 {"usar_operador_model": False, "form": form},
             )
  
+        rol_display = form.cleaned_data.get("tipo_usuario", "operador").capitalize()
+
         Notificacion.objects.create(
             usuario=request.user,
-            mensaje=f"Se creó el operador '{operador.username}'.",
+            mensaje=f"Se creó el {rol_display.lower()} '{operador.username}'.",
             leida=False,
         )
  
-        messages.success(request, f"Operador {nombre} {apellido} creado. Usuario: {operador.username}")
+        messages.success(request, f"{rol_display} {nombre} {apellido} creado. Usuario: {operador.username}")
         return redirect("operadores")
  
     form = OperadorForm(initial={
@@ -514,13 +518,21 @@ def editar_operador(request, pk):
  
         if hubo_cambio:
             operador.save()
-            # Mensaje de éxito
-            messages.success(request, f"✅ Operador '{operador.username}' actualizado correctamente.", extra_tags='editar')
+            rol_display = form.cleaned_data.get("tipo_usuario", getattr(operador, "tipo_usuario", "operador")).capitalize()
+            
             try:
-                crear_notificacion(request.user, f"Se editó el operador '{operador.username}'.")
+                # Usar Notificacion.objects.create para mantener consistencia
+                from core.models.notificacion import Notificacion
+                Notificacion.objects.create(
+                    usuario=request.user,
+                    mensaje=f"Se editó el {rol_display.lower()} '{operador.username}'.",
+                    leida=False,
+                )
             except Exception:
                 pass
-            messages.success(request, f"Operador '{operador.username}' editado correctamente.")
+            
+            # Solo un mensaje de éxito para evitar duplicados
+            messages.success(request, f"{rol_display} '{operador.username}' actualizado correctamente.", extra_tags='editar')
  
         return redirect("operadores")
  
@@ -561,16 +573,19 @@ def eliminar_operador(request, pk):
     nombre_completo = f"{operador.first_name} {operador.last_name}".strip()
     operador.delete()
  
+    rol_display = getattr(operador, "tipo_usuario", "operador").capitalize()
+
     try:
+        from core.models.notificacion import Notificacion
         Notificacion.objects.create(
             usuario=request.user,
-            mensaje=f"Se eliminó el operador '{identificador}'.",
+            mensaje=f"Se eliminó el {rol_display.lower()} '{identificador}'.",
             leida=False,
         )
     except Exception:
         pass
  
-    messages.success(request, f"Operador '{identificador}' eliminado correctamente.")
+    messages.success(request, f"{rol_display} '{identificador}' eliminado correctamente.")
     return redirect("operadores")
  
  
@@ -598,16 +613,19 @@ def dar_baja_operador(request, pk):
  
     operador.save()
  
+    rol_display = getattr(operador, "tipo_usuario", "operador").capitalize()
+
     try:
+        from core.models.notificacion import Notificacion
         Notificacion.objects.create(
             usuario=request.user,
-            mensaje=f"Se dio de baja al operador '{operador.username}'.",
+            mensaje=f"Se dio de baja al {rol_display.lower()} '{operador.username}'.",
             leida=False,
         )
     except Exception:
         pass
  
-    messages.success(request, f"Operador {operador.username} dado de baja correctamente.")
+    messages.success(request, f"{rol_display} '{operador.username}' dado de baja correctamente.")
     return redirect("operadores")
  
  

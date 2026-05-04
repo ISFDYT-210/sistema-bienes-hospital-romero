@@ -16,7 +16,7 @@
                 <span class="material-symbols-outlined">home</span>
             </a>
 
-            {% if es_admin %}
+            {% if es_admin and request.resolver_match.url_name == 'home_admin' %}
             <span class="notificaciones-wrapper" title="Notificaciones" id="notificacionesBell">
                 <span class="material-symbols-outlined header-icon" aria-hidden="true">notifications</span>
 

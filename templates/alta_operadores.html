@@ -23,22 +23,31 @@
     <div class="form-section">
       <h3 class="section-title">Datos del usuario</h3>
 
-      <div class="form-group-item">
+      <div class="form-group-item {% if form.nombre.errors %}campo-error{% endif %}">
         <label for="nombre">Nombre:</label>
         <input type="text" id="nombre" name="nombre" required
                value="{{ form.nombre.value|default:'' }}">
+        {% if form.nombre.errors %}
+          <small class="text-error">{{ form.nombre.errors.0 }}</small>
+        {% endif %}
       </div>
 
-      <div class="form-group-item">
+      <div class="form-group-item {% if form.apellido.errors %}campo-error{% endif %}">
         <label for="apellido">Apellido:</label>
         <input type="text" id="apellido" name="apellido" required
                value="{{ form.apellido.value|default:'' }}">
+        {% if form.apellido.errors %}
+          <small class="text-error">{{ form.apellido.errors.0 }}</small>
+        {% endif %}
       </div>
 
-      <div class="form-group-item">
+      <div class="form-group-item {% if form.pais.errors %}campo-error{% endif %}">
         <label for="pais">Nacionalidad:</label>
         <input type="text" id="pais" name="pais" required
                value="{{ form.pais.value|default:'Argentina' }}">
+        {% if form.pais.errors %}
+          <small class="text-error">{{ form.pais.errors.0 }}</small>
+        {% endif %}
       </div>
 
       <div class="form-group-item {% if form.errors.dni %}campo-error{% endif %}">
@@ -59,7 +68,7 @@
         {% endif %}
       </div>
 
-      <div class="form-group-item">
+      <div class="form-group-item {% if form.tipo_usuario.errors %}campo-error{% endif %}">
         <label for="tipo_usuario">Tipo de Usuario:</label>
         <div class="input-container">
           <select id="tipo_usuario" name="tipo_usuario" required>
@@ -67,14 +76,20 @@
             <option value="supervisor" {% if form.tipo_usuario.value == 'supervisor' %}selected{% endif %}>Supervisor</option>
           </select>
         </div>
+        {% if form.tipo_usuario.errors %}
+          <small class="text-error">{{ form.tipo_usuario.errors.0 }}</small>
+        {% endif %}
       </div>
 
       <!-- Campo 'estado' removido según solicitud -->
 
-      <div class="form-group-item">
+      <div class="form-group-item {% if form.password.errors %}campo-error{% endif %}">
         <label for="password">Contraseña:</label>
         <input type="password" id="password" name="password" placeholder="....." required
                value="{{ form.password.value|default:'' }}">
+        {% if form.password.errors %}
+          <small class="text-error">{{ form.password.errors.0 }}</small>
+        {% endif %}
       </div>
     </div>
 
