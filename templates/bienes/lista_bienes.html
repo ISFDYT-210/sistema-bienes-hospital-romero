@@ -341,7 +341,7 @@
   <div id="alertLimitModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:2000; align-items:center; justify-content:center;">
     <div style="max-width:480px; width:94%;">
       <div style="background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 18px 50px rgba(0,0,0,0.35);">
-        <div style="background:#0087a3; color:#fff; padding:14px 18px; font-size:18px; font-weight:600;"> 
+        <div style="background:#00aec3; color:#fff; padding:14px 18px; font-size:18px; font-weight:600;"> 
           <i class="fas fa-exclamation-circle me-1"></i> Aviso
         </div>
         <div style="padding:18px; color:#333; background:#fff;">
@@ -456,13 +456,13 @@
     
     select.innerHTML = '';
     let html = `
-      <table class="table table-sm table-bordered align-middle">
-        <thead class="table-light">
+      <table class="table table-sm table-striped table-hover align-middle mb-0" style="border-collapse: collapse;">
+        <thead>
           <tr>
-            <th>ID / Nombre</th>
-            <th style="width: 130px;">Fecha Baja <span class="text-danger">*</span></th>
+            <th style="padding-left: 12px;">ID / Nombre</th>
+            <th style="width: 160px;">Fecha Baja <span class="text-danger">*</span></th>
             <th>Expediente</th>
-            <th>Motivo</th>
+            <th style="padding-right: 12px;">Motivo</th>
           </tr>
         </thead>
         <tbody>
@@ -472,10 +472,15 @@
       select.innerHTML += `<option value="${pk}" selected></option>`;
       html += `
         <tr>
-          <td><small><strong>#${pk}</strong><br>${desc}</small></td>
-          <td><input type="date" class="form-control form-control-sm" name="fecha_baja_${pk}" value="${hoy}" required></td>
-          <td><input type="text" class="form-control form-control-sm" name="expediente_baja_${pk}" placeholder="Ej: EX-2025..."></td>
-          <td><input type="text" class="form-control form-control-sm" name="descripcion_baja_${pk}" placeholder="Motivo, destino..."></td>
+          <td style="padding-left: 12px;"><small><strong>#${pk}</strong><br>${desc}</small></td>
+          <td>
+            <div class="input-group input-group-sm input-group-baja">
+              <span class="input-group-text text-secondary"><i class="fas fa-calendar-alt"></i></span>
+              <input type="date" class="form-control custom-input-baja" name="fecha_baja_${pk}" value="${hoy}" required>
+            </div>
+          </td>
+          <td><input type="text" class="form-control form-control-sm custom-input-baja" name="expediente_baja_${pk}" placeholder="Ej: EX-2025..."></td>
+          <td style="padding-right: 12px;"><input type="text" class="form-control form-control-sm custom-input-baja" name="descripcion_baja_${pk}" placeholder="Motivo, destino..."></td>
         </tr>
       `;
     });

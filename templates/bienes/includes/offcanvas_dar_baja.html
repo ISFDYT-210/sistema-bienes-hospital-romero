@@ -1,5 +1,7 @@
 <!-- OFFCANVAS DAR BAJA -->
-<div class="offcanvas offcanvas-end shadow-lg" tabindex="-1" id="offcanvasDarBaja" aria-labelledby="offcanvasDarBajaLabel" style="width: 80vw; max-width: 1200px;">
+<div class="offcanvas offcanvas-end shadow-lg" tabindex="-1" id="offcanvasDarBaja" 
+  aria-labelledby="offcanvasDarBajaLabel" 
+  style="width: 80vw; max-width: 1200px; height: auto !important; max-height: 90vh !important; top: 5vh; bottom: auto; display: flex; flex-direction: column;">
   <div class="offcanvas-header bg-danger text-white">
     <h5 class="offcanvas-title d-flex align-items-center" id="offcanvasDarBajaLabel">
       <i class="fas fa-trash-alt me-2"></i> Dar de baja el bien
@@ -7,15 +9,57 @@
     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
   </div>
 
-  <div class="offcanvas-body">
-    <form id="form-dar-baja" method="post" action="" class="needs-validation" novalidate>
+  <div class="offcanvas-body" style="flex: 0 1 auto !important;">
+    <form id="form-dar-baja" method="post" action="" class="needs-validation m-0 d-flex flex-column" novalidate style="flex: 0 1 auto;">
       {% csrf_token %}
 
       <!-- Campo ChoiceField (Select Múltiple) oculto para enviar los items seleccionados -->
       <select multiple name="bienes_seleccionados_baja" id="bienes_seleccionados_baja" class="d-none"></select>
 
+      <style>
+        .table-baja-container {
+          max-height: 55vh;
+          overflow-y: auto;
+          border: 1px solid #dee2e6;
+          border-radius: 8px;
+        }
+        .table-baja-container thead th {
+          position: sticky;
+          top: 0;
+          z-index: 2;
+          background-color: #f8f9fa;
+          color: #343a40;
+          font-weight: bold;
+          font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+          border-bottom: 2px solid #dee2e6;
+          box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1);
+        }
+        .custom-input-baja {
+          border-radius: 6px !important;
+          border: 1px solid #ced4da;
+          transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+        }
+        .custom-input-baja:focus {
+          border-color: #00aec3;
+          box-shadow: 0 0 0 0.25rem rgba(0, 135, 163, 0.25);
+          outline: 0;
+        }
+        .input-group-baja .input-group-text {
+          background-color: #f8f9fa;
+          border-radius: 6px 0 0 6px !important;
+          border: 1px solid #ced4da;
+          border-right: none;
+        }
+        .input-group-baja .custom-input-baja {
+          border-radius: 0 6px 6px 0 !important;
+        }
+        .table-baja-container table {
+          font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+      </style>
+
       <!-- Contenedor dinámico de tabla para bajas individuales -->
-      <div id="tabla-bienes-baja" class="table-responsive mb-4">
+      <div id="tabla-bienes-baja" class="table-baja-container mb-4">
         <!-- JS inyectará la tabla aquí -->
       </div>
 
