@@ -846,9 +846,10 @@ def reportes_view(request):
         )
  
     try:
-        per_page = int(request.GET.get("per_page") or 30)
+        per_page = int(request.GET.get("per_page") or 15)
     except ValueError:
-        per_page = 30
+        per_page = 15
+
  
     paginator = Paginator(bienes, per_page)
     page_raw = request.GET.get("page") or "1"
@@ -1015,7 +1016,7 @@ def lista_bienes(request):
  
     bienes_queryset = bienes_queryset.order_by(*_build_ordering(orden))
  
-    per_page = 30
+    per_page = 15
     paginator = Paginator(bienes_queryset, per_page)
  
     page_raw = request.GET.get("page", "1")
@@ -1126,7 +1127,7 @@ def lista_bienes_operador(request):
  
     bienes_queryset = bienes_queryset.order_by(*_build_ordering(orden))
  
-    per_page = 30
+    per_page = 15
     paginator = Paginator(bienes_queryset, per_page)
     page_raw = request.GET.get("page", "1")
  
@@ -1669,9 +1670,9 @@ def lista_baja_bienes(request):
     bienes_baja = bienes_baja.order_by(*_build_ordering_baja(orden))
  
     try:
-        per_page = int(request.GET.get("per_page") or 30)
+        per_page = int(request.GET.get("per_page") or 15)
     except ValueError:
-        per_page = 30
+        per_page = 15
  
     paginator = Paginator(bienes_baja, per_page)
  
