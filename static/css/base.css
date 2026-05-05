@@ -35,6 +35,32 @@
     --contrast-negro: #000000;
     --font-encode: 'Encode Sans', sans-serif;
     --font-roboto: 'Roboto', sans-serif;
+    
+    /* Variables de Tema (Modo Claro por defecto) */
+    --bg-main: #FFFFFF;
+    --bg-card: #FFFFFF;
+    --bg-panel: #f8f9fa;
+    --text-main: #000000;
+    --text-muted: #838383;
+    --border-color: #dddddd;
+    --table-header-bg: #f8f9fa;
+    --table-row-alt: #f2f2f2;
+    --input-bg: #FFFFFF;
+    --input-text: #000000;
+}
+
+[data-theme="dark"] {
+    --bg-main: #212529;
+    --bg-card: #2c3034;
+    --bg-panel: #343a40;
+    --text-main: #f8f9fa;
+    --text-muted: #adb5bd;
+    --border-color: #495057;
+    --table-header-bg: #343a40;
+    --table-row-alt: #2a2e33;
+    --input-bg: #383d41;
+    --input-text: #ffffff;
+    --contrast-negro: #ffffff;
 }
 
 body, p, div, a, li, input, select, textarea, td {
@@ -97,10 +123,13 @@ body {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+    background-color: var(--bg-main);
+    color: var(--text-main);
 }
 
 main.main-content {
     flex: 1;
+    background-color: var(--bg-main);
 }
 
 /* ==========================
@@ -643,6 +672,68 @@ html, body {
     vertical-align: middle;
 }
 
+/* Estilos de tabla adaptativos */
+.table {
+    color: var(--text-main) !important;
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+}
+
+.table thead th {
+    background-color: var(--table-header-bg) !important;
+    color: var(--text-main) !important;
+    border-bottom: 2px solid var(--primary-turquesa) !important;
+}
+
+.table-bordered {
+    border: 1px solid var(--border-color) !important;
+}
+
+.table-bordered td, .table-bordered th {
+    border: 1px solid var(--border-color) !important;
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: var(--bg-card) !important;
+}
+
+.table-striped tbody tr:nth-of-type(even) {
+    background-color: var(--table-row-alt) !important;
+}
+
+/* Forzar alternancia de filas en modo oscuro si no se usa table-striped */
+[data-theme="dark"] .table tbody tr:nth-child(even) {
+    background-color: var(--table-row-alt) !important;
+}
+
+/* Modales adaptativos */
+.modal-content {
+    background-color: var(--bg-card) !important;
+    color: var(--text-main) !important;
+}
+
+.modal-header {
+    border-bottom: 1px solid var(--border-color) !important;
+}
+
+.modal-footer {
+    border-top: 1px solid var(--border-color) !important;
+}
+
+/* Inputs globales */
+input:not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]), 
+select, textarea {
+    background-color: var(--input-bg) !important;
+    color: var(--input-text) !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+input:focus, select:focus {
+    border-color: var(--primary-turquesa) !important;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0, 174, 195, 0.25) !important;
+}
+
 /* ==========================
    PAGINACIÓN CUSTOM
    ========================== */
@@ -781,3 +872,76 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 
 
+
+/* ==========================
+   GLOBAL RESPONSIVE ADJUSTMENTS
+   ========================== */
+
+/* Utility for responsive tables */
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-bottom: 1rem;
+}
+
+/* Base breakpoints */
+@media (max-width: 992px) {
+    .system-title {
+        font-size: 16px;
+    }
+    .logo-img {
+        width: 40px;
+        height: 40px;
+        margin-right: 12px;
+    }
+}
+
+@media (max-width: 768px) {
+    .main-header {
+        height: auto;
+        padding: 10px 15px;
+    }
+    
+    .header-container {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .system-title {
+        font-size: 14px;
+        max-width: 180px;
+        line-height: 1.2;
+    }
+
+    .icon-section {
+        gap: 15px;
+    }
+
+    .header-icon {
+        font-size: 24px !important;
+    }
+
+    /* Buttons touch targets */
+    .btn, .menu-button, .page-link {
+        padding: 10px 16px !important;
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 576px) {
+    .system-title {
+        display: none; /* Hide long title on very small screens, logo is enough */
+    }
+    
+    .logo-section {
+        margin-left: 0;
+    }
+    
+    .main-footer .footer-content p {
+        font-size: 13px;
+    }
+}

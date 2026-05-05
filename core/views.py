@@ -81,7 +81,29 @@ def permisos_context(user):
         "puede_gestionar_operadores": es_admin,
         "notificaciones": notificaciones,
         "notificaciones_count": notificaciones_count,
+        "tema_oscuro": getattr(user, "tema_oscuro", False),
     }
+# ============================
+# TEMA / PREFERENCIAS
+# ============================
+
+@login_required
+@require_POST
+def actualizar_tema(request):
+    try:
+        import json
+        data = json.loads(request.body)
+        tema_oscuro = data.get("tema_oscuro", False)
+        
+        user = request.user
+        user.tema_oscuro = tema_oscuro
+        user.save(update_fields=["tema_oscuro"])
+        
+        return JsonResponse({"status": "ok", "tema_oscuro": user.tema_oscuro})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+
 # ============================
 # AUTENTICACIÓN / INICIO
 # ============================
@@ -435,7 +457,7 @@ def editar_operador(request, pk):
         nombre = " ".join((request.POST.get("nombre") or "").strip().split())
         apellido = " ".join((request.POST.get("apellido") or "").strip().split())
         email = (request.POST.get("email") or "").strip()
-        estado = (request.POST.get("estado") or "habilitado").strip()
+        # estado = (request.POST.get("estado") or "habilitado").strip()
         pais = (request.POST.get("pais") or "").strip()
         dni = (request.POST.get("dni") or "").strip()
         tipo_usuario = (request.POST.get("tipo_usuario") or "empleado").strip()
@@ -475,14 +497,7 @@ def editar_operador(request, pk):
             hubo_cambio = True
         else:
             operador.email = email_normalizado
- 
-        is_active_nuevo = estado == "habilitado"
-        if operador.is_active != is_active_nuevo:
-            operador.is_active = is_active_nuevo
-            hubo_cambio = True
-        else:
-            operador.is_active = is_active_nuevo
- 
+  
         if hasattr(operador, "estado"):
             if operador.estado != estado:
                 operador.estado = estado
@@ -1016,7 +1031,7 @@ def lista_bienes(request):
  
     bienes_queryset = bienes_queryset.order_by(*_build_ordering(orden))
  
-    per_page = 15
+    per_page = 30
     paginator = Paginator(bienes_queryset, per_page)
  
     page_raw = request.GET.get("page", "1")
@@ -1127,7 +1142,7 @@ def lista_bienes_operador(request):
  
     bienes_queryset = bienes_queryset.order_by(*_build_ordering(orden))
  
-    per_page = 15
+    per_page = 30
     paginator = Paginator(bienes_queryset, per_page)
     page_raw = request.GET.get("page", "1")
  
@@ -1670,9 +1685,9 @@ def lista_baja_bienes(request):
     bienes_baja = bienes_baja.order_by(*_build_ordering_baja(orden))
  
     try:
-        per_page = int(request.GET.get("per_page") or 15)
+        per_page = int(request.GET.get("per_page") or 30)
     except ValueError:
-        per_page = 15
+        per_page = 30
  
     paginator = Paginator(bienes_baja, per_page)
  

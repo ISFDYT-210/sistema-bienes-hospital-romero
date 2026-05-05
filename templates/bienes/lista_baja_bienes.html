@@ -83,9 +83,9 @@
       </div>
     </div>
 
-    <div class="col-12 mt-2 text-muted">
+    <div class="col-12 mt-2" style="font-family: var(--font-roboto); color: var(--secondary-gris); font-size: 14px;">
       {% if request.GET.q %}Mostrando resultados para: <strong>{{ request.GET.q }}</strong> · {% endif %}
-      Total {{ paginator.count }}{% if is_paginated %} — página {{ page_obj.number }} de {{ paginator.num_pages }}{% endif %}
+      Mostrando {{ page_obj.paginator.count }} bienes en total
     </div>
   </form>
 
