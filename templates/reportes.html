@@ -4,24 +4,23 @@
 
 {% block content %}
 <div class="container py-4">
-  <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
     <h2 class="m-0">Reporte de Bienes Patrimoniales</h2>
-    <div class="d-flex gap-2">
-      <form method="get" class="d-flex gap-2">
-        <select name="scope" class="form-select me-2" style="min-width: 170px;">
+    <div class="btn-inst-group">
+      <form method="get" class="d-flex align-items-center gap-2">
+        <select name="scope" class="form-select" style="min-width: 170px; height: 38px;">
           <option value="24h" {% if scope == '24h' %}selected{% endif %}>Últimas 24 h</option>
           <option value="all" {% if scope == 'all' %}selected{% endif %}>Todos</option>
         </select>
-        <button class="btn btn-primary" type="submit">
-          <i class="fa-solid fa-rotate me-1"></i> Actualizar
+        <button class="btn-inst-filter" type="submit">
+          <i class="fa-solid fa-rotate"></i> Actualizar
         </button>
       </form>
-        <a  class="btn btn-danger d-flex align-items-center justify-content-center gap-2 px-3"
-            style="min-width: 160px;"
-            href="{% url 'reportes_pdf' %}?scope={{ scope|default:'24h' }}">
-            <i class="fa-solid fa-file-pdf"></i>
-                <span>Exportar PDF</span>
-        </a>
+      <a class="btn-inst-primary"
+         href="{% url 'reportes_pdf' %}?scope={{ scope|default:'24h' }}">
+        <i class="fa-solid fa-file-pdf"></i>
+        <span>Exportar PDF</span>
+      </a>
     </div>
   </div>
 
@@ -30,7 +29,7 @@
   <!-- Tabla de bienes -->
   <div class="table-responsive mb-4">
     <table class="table table-striped table-bordered align-middle">
-      <thead class="table-dark">
+      <thead class="thead-turquesa">
         <tr>
           <th>ID</th>
           <th>Descripción</th>
