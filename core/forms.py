@@ -3,6 +3,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
 from core.models import BienPatrimonial
 from core.models.expediente import Expediente
 from datetime import date
@@ -159,13 +160,20 @@ class OperadorForm(forms.Form):
         initial='operador',
         label='Tipo de Usuario'
     )
-    password = forms.CharField(required=False, widget=forms.PasswordInput, label='Contraseña')
+    password = forms.CharField(
+        required=False,
+        widget=forms.PasswordInput,
+        label='Contraseña',
+        help_text='Mínimo 8 caracteres, mayúscula, minúscula, número y carácter especial.'
+    )
 
     def __init__(self, *args, operador_pk=None, **kwargs):
         self.operador_pk = operador_pk
         super().__init__(*args, **kwargs)
         if self.operador_pk:
             self.fields['dni'].required = False
+        else:
+            self.fields['password'].required = True
 
     def clean_dni(self):
         dni = (self.cleaned_data.get('dni') or '').strip()
@@ -195,3 +203,14 @@ class OperadorForm(forms.Form):
         if operadores.exists():
             raise ValidationError('Ya existe un operador con ese email')
         return email
+
+    def clean_password(self):
+        password = self.cleaned_data.get('password') or ''
+
+        if not self.operador_pk and not password:
+            raise ValidationError('La contraseña es obligatoria para un nuevo usuario.')
+
+        if password:
+            validate_password(password)
+
+        return password
