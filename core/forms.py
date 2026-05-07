@@ -5,37 +5,25 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
 from core.models import BienPatrimonial
 from core.models.expediente import Expediente
 from datetime import date
 
 
-class MultipleFileInput(forms.ClearableFileInput):
-    allow_multiple_selected = True
-
-class MultipleFileField(forms.FileField):
-    def __init__(self, *args, **kwargs):
-        kwargs.setdefault("widget", MultipleFileInput(attrs={'class': 'form-control', 'accept': '.xlsx,.xls,.xlsm,.xlsb,.ods'}))
-        super().__init__(*args, **kwargs)
-
-    def clean(self, data, initial=None):
-        single_file_clean = super().clean
-        if isinstance(data, (list, tuple)):
-            return [single_file_clean(d, initial) for d in data]
-        return single_file_clean(data, initial)
-
 
 # ========== FORMULARIO DE CARGA MASIVA ==========
 class CargaMasivaForm(forms.Form):
-    archivo_excel = MultipleFileField(
-        label='Seleccionar archivo(s) Excel',
-        help_text='Formatos soportados: .xlsx, .xls, .xlsm, .xlsb, .ods'
+    archivo_excel = forms.FileField(
+        label='Seleccionar archivo Excel',
+        help_text='Formatos soportados: .xlsx, .xls',
+        widget=forms.ClearableFileInput(attrs={'class': 'form-control'})
     )
-    servicio = forms.CharField(
+    sector = forms.CharField(
         max_length=100,
         required=False,
-        label='Servicio por defecto (opcional)',
-        help_text='Si se deja vacío, se tomará el servicio de cada fila del archivo.',
+        label='Sector por defecto (opcional)',
+        help_text='Si se deja vacío, se tomará el sector de cada fila del archivo.',
         widget=forms.TextInput(attrs={'class': 'form-control'})
     )
 
@@ -209,6 +197,7 @@ class BienPatrimonialForm(forms.ModelForm):
         if n_cmp and not n_exp:
             self.add_error("numero_expediente", "Si informás N° de compra, debés indicar el N° de Expediente.")
 
+
         # Precio: si el origen no es COMPRA, ignorar precio
         if cleaned.get("origen") and cleaned["origen"] != "COMPRA":
             cleaned["valor_adquisicion"] = None
@@ -271,7 +260,7 @@ class OperadorForm(forms.Form):
         required=False,
         widget=forms.PasswordInput,
         label='Contraseña',
-        help_text='Debe tener al menos 8 caracteres, una mayúscula, un número y un carácter especial.'
+        help_text='Mínimo 8 caracteres, mayúscula, minúscula, número y carácter especial (Ej: Lm9!abcd).'
     )
 
     def __init__(self, *args, operador_pk=None, **kwargs):
@@ -279,6 +268,8 @@ class OperadorForm(forms.Form):
         super().__init__(*args, **kwargs)
         if self.operador_pk:
             self.fields['dni'].required = False
+        else:
+            self.fields['password'].required = True
 
     def clean_dni(self):
         dni = (self.cleaned_data.get('dni') or '').strip()
