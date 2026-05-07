@@ -4,7 +4,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("core", "0002_notificacion_eliminada_operador_dni_and_more"),
+        ("core", "0002_usuario_tema_oscuro"),
     ]
 
     operations = [

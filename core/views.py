@@ -1791,6 +1791,18 @@ def marcar_notificaciones_leidas(request):
 
 @login_required
 @require_POST
+def borrar_todas_notificaciones(request):
+    if request.method == "POST":
+        Notificacion.objects.filter(
+            usuario=request.user,
+            eliminada=False
+        ).update(eliminada=True)
+        return JsonResponse({"ok": True})
+    return JsonResponse({"ok": False}, status=400)
+
+
+@login_required
+@require_POST
 def eliminar_notificacion(request, pk):
     notif = get_object_or_404(Notificacion, pk=pk)
     if notif.usuario != request.user and not request.user.is_superuser:
@@ -1822,3 +1834,82 @@ def crear_notificacion_admins(mensaje):
     ).distinct()
     for admin in admins:
         crear_notificacion(admin, mensaje)
+
+@login_required
+def agregar_servicio_ajax(request):
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "Método no permitido."}, status=405)
+
+    perms = permisos_context(request.user)
+    if not perms["es_admin"]:
+        return JsonResponse({"ok": False, "error": "Sin permisos."}, status=403)
+
+    import json
+    try:
+        data = json.loads(request.body)
+        nombre = (data.get("nombre") or "").strip().title()
+    except Exception:
+        return JsonResponse({"ok": False, "error": "Datos inválidos."}, status=400)
+
+    if not nombre:
+        return JsonResponse({"ok": False, "error": "El nombre no puede estar vacío."})
+
+    SERVICIOS_FIJOS = [
+        "Direccion Asociada Area Tecnica", "SAP (Servicio De Area Programatica Y Redes De Salud)",
+        "Departamento Sistema De Informacion - Samo Turnos Y Estadistica", "Epidemiologia",
+        "Jardin Maternal", "Recuperacion Clinica", "Farmacia", "Direccion Asociada Medico Quirurgica",
+        "Percial", "Cirugia", "Hemoterapia", "Clinica", "Patologia", "Toxicologia",
+        "Esterilizacion", "Neuropsicologia", "Seguridad E Higiene", "U.T.I.",
+        "Area Limpieza Hospitalaria", "Emergencia", "Podologia Y Peluqueria", "Infectologia",
+        "Odontologia", "Consultorios", "Cardiologia", "Gerenciamiento De Camas", "Neurologia",
+        "Gastroenterologia", "Rehabilitacion Fisica Y Kinesiologia", "Neonatologia", "Laboratorio",
+        "Sala Gestion De Usuarios", "Diagnostico Por Imagenes", "Reumatologia Y Oftalmologia",
+        "Costurero", "CAPER", "Quirofano", "Consejeria", "Traumatologia", "Vacunacion",
+        "Pediatria Y Neonatologia", "Dermatologia", "Tocoginecologia", "Oncologia",
+    ]
+
+    ya_existe_fijo = any(nombre.lower() == s.lower() for s in SERVICIOS_FIJOS)
+    ya_existe_extra = ServicioExtra.objects.filter(nombre__iexact=nombre).exists()
+
+    if ya_existe_fijo or ya_existe_extra:
+        return JsonResponse({"ok": False, "error": f"El servicio '{nombre}' ya existe."})
+
+    ServicioExtra.objects.create(nombre=nombre)
+    return JsonResponse({"ok": True, "nombre": nombre, "mensaje": f"Servicio '{nombre}' agregado correctamente."})
+ 
+@login_required
+def agregar_servicio(request):
+    perms = permisos_context(request.user)
+    if not perms["es_admin"]:
+        messages.error(request, "No tienes permisos para agregar servicios.")
+        return redirect("home_operador")
+
+    if request.method == "POST":
+        nombre = (request.POST.get("nombre") or "").strip().title()
+        SERVICIOS_FIJOS = [
+            "Direccion Asociada Area Tecnica", "SAP (Servicio de Area Programatica y Redes de Salud)",
+            "Departamento Sistema de Informacion - SAMO Turnos y Estadistica", "Epidemiologia",
+            "Jardin Maternal", "Recuperacion Clinica", "Farmacia", "Direccion Asociada Medico Quirurgica",
+            "Percial", "Cirugia", "Hemoterapia", "Clinica", "Patologia", "Toxicologia",
+            "Esterilizacion", "Neuropsicologia", "Seguridad e Higiene", "U.T.I.",
+            "Area Limpieza Hospitalaria", "Emergencia", "Podologia y Peluqueria", "Infectologia",
+            "Odontologia", "Consultorios", "Cardiologia", "Gerenciamiento de Camas", "Neurologia",
+            "Gastroenterologia", "Rehabilitacion Fisica y Kinesiologia", "Neonatologia", "Laboratorio",
+            "Sala Gestion de Usuarios", "Diagnostico por Imagenes", "Reumatologia y Oftalmologia",
+            "Costurero", "CAPER", "Quirofano", "Consejeria", "Traumatologia", "Vacunacion",
+            "Pediatria y Neonatologia", "Dermatologia", "Tocoginecologia", "Oncologia",
+        ]
+        ya_existe_fijo = any(nombre.lower() == s.lower() for s in SERVICIOS_FIJOS)
+        ya_existe_extra = ServicioExtra.objects.filter(nombre__iexact=nombre).exists()
+
+        if ya_existe_fijo or ya_existe_extra:
+            messages.error(request, f"El servicio '{nombre}' ya existe.")
+        elif nombre:
+            ServicioExtra.objects.create(nombre=nombre)
+            messages.success(request, f"Servicio '{nombre}' agregado correctamente.")
+        else:
+            messages.error(request, "El nombre del servicio no puede estar vacío.")
+        
+        return redirect("alta_bien")
+
+    return render(request, "agregar_servicio.html")

@@ -9,6 +9,7 @@ from .models.expediente import Expediente
 from .models.bien_patrimonial import BienPatrimonial
 from .models.notificacion import Notificacion
 from .models.usuario import Usuario
+from .models.servicio_extra import ServicioExtra
 
 
 # ===== Helpers seguros =====
