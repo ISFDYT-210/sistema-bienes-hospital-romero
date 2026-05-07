@@ -197,7 +197,7 @@ class OperadorForm(forms.Form):
         required=False,
         widget=forms.PasswordInput,
         label='Contraseña',
-        help_text='Mínimo 8 caracteres, mayúscula, minúscula, número y carácter especial.'
+        help_text='Mínimo 8 caracteres, mayúscula, minúscula, número y carácter especial (Ej: Lm9!abcd).'
     )
 
     def __init__(self, *args, operador_pk=None, **kwargs):

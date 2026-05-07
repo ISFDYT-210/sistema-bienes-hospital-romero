@@ -122,6 +122,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 isValid = false;
                 message = 'Ingrese un email válido.';
             }
+        } else if (input.id === 'password' && input.value.trim()) {
+            const val = input.value;
+            const hasUpper = /[A-Z]/.test(val);
+            const hasLower = /[a-z]/.test(val);
+            const hasNumber = /[0-9]/.test(val);
+            const hasSpecial = /[^A-Za-z0-9]/.test(val);
+            if (!(hasUpper && hasLower && hasNumber && hasSpecial && val.length >= 8)) {
+                isValid = false;
+                message = 'Formato requerido: 8+ caracteres, con mayúscula, minúscula, número y símbolo (Ej: Lm9!abcd)';
+            }
         }
 
         if (!isValid) {

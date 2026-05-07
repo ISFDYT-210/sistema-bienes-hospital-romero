@@ -135,7 +135,7 @@ def login_view(request):
             return render(request, "login.html", ctx, status=401)
 
         if user is None:
-            return _rerender_error("Usuario o contraseña incorrectos")
+            return _rerender_error("Usuario o contraseña incorrectos. Formato requerido (Ej: Hospit@l1)")
 
         if not tipo_usuario:
             if getattr(user, "is_superuser", False):
@@ -917,6 +917,10 @@ def reportes_view(request):
             .order_by("-fecha_adquisicion", "pk")
         )
 
+    servicios_seleccionados = request.GET.getlist("servicio")
+    if servicios_seleccionados:
+        bienes = bienes.filter(servicios__in=servicios_seleccionados)
+
     try:
         per_page = int(request.GET.get("per_page") or 15)
     except ValueError:
@@ -959,6 +963,23 @@ def reportes_view(request):
     qd = request.GET.copy()
     qd.pop("page", None)
     querystring = qd.urlencode()
+
+    from core.models.servicio_extra import ServicioExtra
+    SERVICIOS_FIJOS = [
+        'Area Limpieza Hospitalaria', 'CAPER', 'Cardiologia', 'Cirugia', 'Clinica',
+        'Consejeria', 'Consultorios', 'Departamento Sistema De Informacion - Samo Turnos Y Estadistica',
+        'Dermatologia', 'Diagnostico Por Imagenes', 'Direccion Asociada Area Tecnica',
+        'Direccion Asociada Medico Quirurgica', 'Emergencia', 'Epidemiologia', 'Esterilizacion',
+        'Farmacia', 'Gastroenterologia', 'Gerenciamiento De Camas', 'Hemoterapia', 'Infectologia',
+        'Jardin Maternal', 'Laboratorio', 'Neonatologia', 'Neurologia', 'Neuropsicologia',
+        'Odontologia', 'Oncologia', 'Patologia', 'Pediatria Y Neonatologia', 'Percial',
+        'Podologia Y Peluqueria', 'Quirofano', 'Recuperacion Clinica',
+        'Rehabilitacion Fisica Y Kinesiologia', 'Reumatologia Y Oftalmologia',
+        'SAP (Servicio De Area Programatica Y Redes De Salud)', 'Sala Gestion De Usuarios',
+        'Seguridad E Higiene', 'Tocoginecologia', 'Toxicologia', 'Traumatologia', 'U.T.I.', 'Vacunacion',
+    ]
+    extras = list(ServicioExtra.objects.values_list('nombre', flat=True))
+    todos_servicios = sorted(set(SERVICIOS_FIJOS + extras))
 
     ctx = permisos_context(request.user)
     ctx.update({

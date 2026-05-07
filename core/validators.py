@@ -31,5 +31,5 @@ class ComplexPasswordValidator:
     def get_help_text(self):
         return _(
             'Tu contraseña debe tener al menos 8 caracteres e incluir una letra mayúscula, '
-            'una letra minúscula, un número y un carácter especial.'
+            'una letra minúscula, un número y un carácter especial (Ej: Lm9!abcd).'
         )
