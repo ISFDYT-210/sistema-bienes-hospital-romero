@@ -5,7 +5,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from core.forms import CargaMasivaForm, BienPatrimonialForm, OperadorForm
-from core.models import BienPatrimonial
+from core.models import BienPatrimonial, ServicioExtra
 from django.db.models import Q, F
 from django.views.decorators.http import require_POST
 from django.db import transaction, IntegrityError
@@ -230,7 +230,10 @@ def bienes(request):
         form = BienPatrimonialForm()
 
     context = perms
-    context.update({"form": form})
+    context.update({
+        "form": form,
+        "servicios_extra": ServicioExtra.objects.all(),
+})
     return render(request, "bienes.html", context)
 
 
@@ -828,12 +831,75 @@ def reportes_pdf(request):
 
 
 @login_required
+def agregar_servicio(request):
+    perms = permisos_context(request.user)
+    if not perms["es_admin"]:
+        messages.error(request, "No tienes permisos para acceder a esta página.")
+        return redirect("home_operador")
+
+    if request.method == "POST":
+        nombre = (request.POST.get("nombre") or "").strip().title()
+        SERVICIOS_FIJOS = [
+            "Direccion Asociada Area Tecnica", "SAP (Servicio de Area Programatica y Redes de Salud)",
+            "Departamento Sistema de Informacion - SAMO Turnos y Estadistica", "Epidemiologia",
+            "Jardin Maternal", "Recuperacion Clinica", "Farmacia", "Direccion Asociada Medico Quirurgica",
+            "Percial", "Cirugia", "Hemoterapia", "Clinica", "Patologia", "Toxicologia",
+            "Esterilizacion", "Neuropsicologia", "Seguridad e Higiene", "U.T.I.",
+            "Area Limpieza Hospitalaria", "Emergencia", "Podologia y Peluqueria", "Infectologia",
+            "Odontologia", "Consultorios", "Cardiologia", "Gerenciamiento de Camas", "Neurologia",
+            "Gastroenterologia", "Rehabilitacion Fisica y Kinesiologia", "Neonatologia", "Laboratorio",
+            "Sala Gestion de Usuarios", "Diagnostico por Imagenes", "Reumatologia y Oftalmologia",
+            "Costurero", "CAPER", "Quirofano", "Consejeria", "Traumatologia", "Vacunacion",
+            "Pediatria y Neonatologia", "Dermatologia", "Tocoginecologia", "Oncologia",
+        ]
+        ya_existe_fijo = any(nombre.lower() == s.lower() for s in SERVICIOS_FIJOS)
+        ya_existe_extra = ServicioExtra.objects.filter(nombre__iexact=nombre).exists()
+
+        if not nombre:
+            messages.error(request, "El nombre no puede estar vacío.")
+        elif ya_existe_fijo or ya_existe_extra:
+            messages.error(request, f"El servicio '{nombre}' ya existe.")
+        else:
+            ServicioExtra.objects.create(nombre=nombre)
+            messages.success(request, f"Servicio '{nombre}' agregado correctamente.")
+            return redirect("agregar_servicio")
+
+    servicios = ServicioExtra.objects.all()
+    ctx = perms
+    ctx.update({"servicios": servicios})
+    return render(request, "agregar_servicio.html", ctx)
+
+@login_required
 def reportes_view(request):
     scope = (request.GET.get("scope") or "24h").lower()
     now = timezone.now()
 
     if scope == "24h":
         since_dt = now - timedelta(hours=24)
+        since_date = since_dt.date()
+        bienes = (
+            BienPatrimonial.objects
+            .select_related("expediente")
+            .filter(
+                Q(fecha_adquisicion__gte=since_date) |
+                Q(fecha_baja__gte=since_date)
+            )
+            .order_by("-fecha_baja", "-fecha_adquisicion", "pk")
+        )
+    elif scope == "12h":
+        since_dt = now - timedelta(hours=12)
+        since_date = since_dt.date()
+        bienes = (
+            BienPatrimonial.objects
+            .select_related("expediente")
+            .filter(
+                Q(fecha_adquisicion__gte=since_date) |
+                Q(fecha_baja__gte=since_date)
+            )
+            .order_by("-fecha_baja", "-fecha_adquisicion", "pk")
+        )
+    elif scope == "6h":
+        since_dt = now - timedelta(hours=6)
         since_date = since_dt.date()
         bienes = (
             BienPatrimonial.objects
@@ -898,6 +964,8 @@ def reportes_view(request):
     ctx.update({
         "bienes": page_obj.object_list,
         "scope": scope,
+        "servicios_seleccionados": servicios_seleccionados,
+        "todos_servicios": todos_servicios,
         "paginator": paginator,
         "page_obj": page_obj,
         "is_paginated": paginator.num_pages > 1,
@@ -906,6 +974,7 @@ def reportes_view(request):
         "next_page": next_page,
         "querystring": querystring,
     })
+
     return render(request, "reportes.html", ctx)
 
 
@@ -1141,7 +1210,11 @@ def editar_bien(request, pk):
         form = BienPatrimonialForm(instance=bien)
 
     context = permisos_context(request.user)
-    context.update({"form": form, "bien": bien})
+    context.update({
+        "form": form,
+        "bien": bien,
+        "servicios_extra": ServicioExtra.objects.all(),
+    })
     return render(request, "bienes/editar_bien.html", context)
 
 

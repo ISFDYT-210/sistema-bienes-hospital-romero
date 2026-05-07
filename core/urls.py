@@ -42,6 +42,8 @@ urlpatterns = [
     path('base/', views.base, name='base'),
     path("reportes/", views.reportes_view, name="reportes"),
     path("reportes/pdf/", views.reportes_pdf, name="reportes_pdf"),
+    path('servicios/agregar/', views.agregar_servicio, name='agregar_servicio'),
+    path('servicios/agregar-ajax/', views.agregar_servicio_ajax, name='agregar_servicio_ajax'),
 
     # ===== Bienes =====
     # Acciones específicas primero

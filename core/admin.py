@@ -142,7 +142,6 @@ class BienPatrimonialAdmin(admin.ModelAdmin):
         'clave_unica',
         first_present(BienPatrimonial, ['nombre', 'descripcion']),
         'cantidad',
-        'servicios',
         'estado',
         'expediente',
         'origen',
@@ -211,6 +210,15 @@ class BienPatrimonialAdmin(admin.ModelAdmin):
         # Mantiene tu validación del modelo
         obj.full_clean()
         super().save_model(request, obj, form, change)
+
+
+# ===== Servicio Extra Admin =====
+@admin.register(ServicioExtra, site=custom_admin_site)
+class ServicioExtraAdmin(admin.ModelAdmin):
+    list_display = ['nombre']
+    search_fields = ['nombre']
+    ordering = ['nombre']
+
 
 
 # ===== Notificacion Admin =====
