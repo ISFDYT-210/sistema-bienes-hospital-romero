@@ -6,7 +6,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from core.forms import CargaMasivaForm, BienPatrimonialForm, OperadorForm
-from core.models import BienPatrimonial, ArchivoCargaMasiva
+from core.models import BienPatrimonial, ArchivoCargaMasiva, ServicioExtra
 from django.db.models import Q, F
 from django.views.decorators.http import require_POST
 from django.db import transaction, IntegrityError
@@ -241,7 +241,10 @@ def bienes(request):
         form = BienPatrimonialForm()
  
     context = perms
-    context.update({"form": form})
+    context.update({
+        "form": form,
+        "servicios_extra": ServicioExtra.objects.all(),
+})
     return render(request, "bienes.html", context)
  
  
@@ -975,14 +978,154 @@ def reportes_pdf(request):
         resp["Content-Disposition"] = f'inline; filename="reporte_{scope}_fallback.pdf"'
         return resp
  
+@login_required
+def agregar_servicio_ajax(request):
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "Método no permitido."}, status=405)
+
+    perms = permisos_context(request.user)
+    if not perms["es_admin"]:
+        return JsonResponse({"ok": False, "error": "Sin permisos."}, status=403)
+
+    import json
+    try:
+        data = json.loads(request.body)
+        nombre = (data.get("nombre") or "").strip().title()
+    except Exception:
+        return JsonResponse({"ok": False, "error": "Datos inválidos."}, status=400)
+
+    if not nombre:
+        return JsonResponse({"ok": False, "error": "El nombre no puede estar vacío."})
+
+    SERVICIOS_FIJOS = [
+        "Apoyo A La Comunidad", "Area Guardia", "Area Limpieza Hospitalaria",
+        "Area Parque Cultural", "Arquitectura", "CAPER", "Camilleros", "Cardiologia",
+        "Charcot", "Cirugia", "Clinica", "Cocina", "Compras", "Conmutador", "Consejeria",
+        "Consultorio De Gastroenterologia", "Consultorio Externo Salud Mental",
+        "Consultorios Externos Pab V", "Contable", "Costurero",
+        "Cud Y Servicios De Consumos Problematicos", "Departamento De Enfermerias Supervision",
+        "Departamento Sistema De Informacion - Samo Turnos Y Estadistica",
+        "Deposito Descartable", "Deposito General", "Dermatologia", "Diagnostico Por Imagenes",
+        "Dira", "Direccion Administrativa", "Direccion Asociada Area Tecnica",
+        "Direccion Asociada Medico Quirurgica", "Direccion Ejecutiva", "Direccion Salud Mental",
+        "Dispositivo Artistico Cultural", "Docencia E Investigacion",
+        "Donacion Fundacion Florencio Perez", "Emergencia", "En Guarda Patrimoniales",
+        "Enfermeria", "Epidemiologia", "Estadistica", "Estadistica Central",
+        "Estadistica Pabellon V", "Esterilizacion", "Farmacia", "Gastroenterologia",
+        "Gerenciamiento De Camas", "Hemoterapia", "Infancias Y Juventudes", "Infectologia",
+        "Informatica", "Infraestructura Y Mantenimiento", "Intendencia", "Jardin Maternal",
+        "Laboratorio", "Lasegue", "Legales", "Limpieza", "Mesa De Entrada",
+        "Neumonologia Y Oftalmologia", "Neurocirugia", "Neuropsicologia", "Odontologia",
+        "Oncologia", "Patologia", "Patrimoniales", "Pediatria Y Neonatologia", "Penfield",
+        "Percial", "Podologia Y Peluqueria", "Polo Educativo", "Pre Alta", "Quirofano",
+        "RRHH", "Recuperacion Clinica", "Registro Civil", "Rehabilitacion Fisica Y Kinesiologia",
+        "Rehabilitacion Salud Mental Direccion", "Reumatologia Y Oftalmologia",
+        "SAC", "SAM", "SAMO Contable", "SAMO Facturacion",
+        "SAP (Servicio De Area Programatica Y Redes De Salud)", "SGU", "Sala De Endoscopia",
+        "Sala F", "Sala G", "Seguridad E Higiene", "Servicio De Psicologia",
+        "Servicio Rehabilitacion Larga Distancia", "Servicio Social", "Sumar",
+        "Tocoginecologia", "Toxicologia", "Traumatologia", "U.T.I.", "UCAC",
+        "Vacunacion", "Vigilancia",
+    ]
+
+    ya_existe_fijo = any(nombre.lower() == s.lower() for s in SERVICIOS_FIJOS)
+    ya_existe_extra = ServicioExtra.objects.filter(nombre__iexact=nombre).exists()
+
+    if ya_existe_fijo or ya_existe_extra:
+        return JsonResponse({"ok": False, "error": f"El servicio '{nombre}' ya existe."})
+
+    ServicioExtra.objects.create(nombre=nombre)
+    return JsonResponse({"ok": True, "nombre": nombre, "mensaje": f"Servicio '{nombre}' agregado correctamente."})
  
+@login_required
+def agregar_servicio(request):
+    perms = permisos_context(request.user)
+    if not perms["es_admin"]:
+        messages.error(request, "No tienes permisos para acceder a esta página.")
+        return redirect("home_operador")
+
+    if request.method == "POST":
+        nombre = (request.POST.get("nombre") or "").strip().title()
+        SERVICIOS_FIJOS = [
+            "Apoyo A La Comunidad", "Area Guardia", "Area Limpieza Hospitalaria",
+            "Area Parque Cultural", "Arquitectura", "CAPER", "Camilleros", "Cardiologia",
+            "Charcot", "Cirugia", "Clinica", "Cocina", "Compras", "Conmutador", "Consejeria",
+            "Consultorio De Gastroenterologia", "Consultorio Externo Salud Mental",
+            "Consultorios Externos Pab V", "Contable", "Costurero",
+            "Cud Y Servicios De Consumos Problematicos", "Departamento De Enfermerias Supervision",
+            "Departamento Sistema De Informacion - Samo Turnos Y Estadistica",
+            "Deposito Descartable", "Deposito General", "Dermatologia", "Diagnostico Por Imagenes",
+            "Dira", "Direccion Administrativa", "Direccion Asociada Area Tecnica",
+            "Direccion Asociada Medico Quirurgica", "Direccion Ejecutiva", "Direccion Salud Mental",
+            "Dispositivo Artistico Cultural", "Docencia E Investigacion",
+            "Donacion Fundacion Florencio Perez", "Emergencia", "En Guarda Patrimoniales",
+            "Enfermeria", "Epidemiologia", "Estadistica", "Estadistica Central",
+            "Estadistica Pabellon V", "Esterilizacion", "Farmacia", "Gastroenterologia",
+            "Gerenciamiento De Camas", "Hemoterapia", "Infancias Y Juventudes", "Infectologia",
+            "Informatica", "Infraestructura Y Mantenimiento", "Intendencia", "Jardin Maternal",
+            "Laboratorio", "Lasegue", "Legales", "Limpieza", "Mesa De Entrada",
+            "Neumonologia Y Oftalmologia", "Neurocirugia", "Neuropsicologia", "Odontologia",
+            "Oncologia", "Patologia", "Patrimoniales", "Pediatria Y Neonatologia", "Penfield",
+            "Percial", "Podologia Y Peluqueria", "Polo Educativo", "Pre Alta", "Quirofano",
+            "RRHH", "Recuperacion Clinica", "Registro Civil", "Rehabilitacion Fisica Y Kinesiologia",
+            "Rehabilitacion Salud Mental Direccion", "Reumatologia Y Oftalmologia",
+            "SAC", "SAM", "SAMO Contable", "SAMO Facturacion",
+            "SAP (Servicio De Area Programatica Y Redes De Salud)", "SGU", "Sala De Endoscopia",
+            "Sala F", "Sala G", "Seguridad E Higiene", "Servicio De Psicologia",
+            "Servicio Rehabilitacion Larga Distancia", "Servicio Social", "Sumar",
+            "Tocoginecologia", "Toxicologia", "Traumatologia", "U.T.I.", "UCAC",
+            "Vacunacion", "Vigilancia",
+        ]
+        ya_existe_fijo = any(nombre.lower() == s.lower() for s in SERVICIOS_FIJOS)
+        ya_existe_extra = ServicioExtra.objects.filter(nombre__iexact=nombre).exists()
+
+        if not nombre:
+            messages.error(request, "El nombre no puede estar vacío.")
+        elif ya_existe_fijo or ya_existe_extra:
+            messages.error(request, f"El servicio '{nombre}' ya existe.")
+        else:
+            ServicioExtra.objects.create(nombre=nombre)
+            messages.success(request, f"Servicio '{nombre}' agregado correctamente.")
+            return redirect("agregar_servicio")
+
+    servicios = ServicioExtra.objects.all()
+    ctx = perms
+    ctx.update({"servicios": servicios})
+    return render(request, "agregar_servicio.html", ctx)
+
 @login_required
 def reportes_view(request):
     scope = (request.GET.get("scope") or "24h").lower()
     now = timezone.now()
  
+    servicios_seleccionados = request.GET.getlist("servicio")
+
     if scope == "24h":
         since_dt = now - timedelta(hours=24)
+        since_date = since_dt.date()
+        bienes = (
+            BienPatrimonial.objects
+            .select_related("expediente")
+            .filter(
+                Q(fecha_adquisicion__gte=since_date) |
+                Q(fecha_baja__gte=since_date)
+            )
+            .order_by("-fecha_baja", "-fecha_adquisicion", "pk")
+        )
+    elif scope == "12h":
+        since_dt = now - timedelta(hours=12)
+        since_date = since_dt.date()
+        bienes = (
+            BienPatrimonial.objects
+            .select_related("expediente")
+            .filter(
+                Q(fecha_adquisicion__gte=since_date) |
+                Q(fecha_baja__gte=since_date)
+            )
+            .order_by("-fecha_baja", "-fecha_adquisicion", "pk")
+        )
+    elif scope == "6h":
+        since_dt = now - timedelta(hours=6)
         since_date = since_dt.date()
         bienes = (
             BienPatrimonial.objects
@@ -999,6 +1142,8 @@ def reportes_view(request):
             .select_related("expediente")
             .order_by("-fecha_adquisicion", "pk")
         )
+    if servicios_seleccionados:
+        bienes = bienes.filter(servicios__in=servicios_seleccionados)
  
     try:
         per_page = int(request.GET.get("per_page") or 15)
@@ -1047,10 +1192,46 @@ def reportes_view(request):
     qd.pop("page", None)
     querystring = qd.urlencode()
  
+    from core.models.servicio_extra import ServicioExtra
+    SERVICIOS_FIJOS = [
+        'Apoyo A La Comunidad', 'Area Guardia', 'Area Limpieza Hospitalaria',
+        'Area Parque Cultural', 'Arquitectura', 'CAPER', 'Camilleros', 'Cardiologia',
+        'Charcot', 'Cirugia', 'Clinica', 'Cocina', 'Compras', 'Conmutador', 'Consejeria',
+        'Consultorio De Gastroenterologia', 'Consultorio Externo Salud Mental',
+        'Consultorios Externos Pab V', 'Contable', 'Costurero',
+        'Cud Y Servicios De Consumos Problematicos', 'Departamento De Enfermerias Supervision',
+        'Departamento Sistema De Informacion - Samo Turnos Y Estadistica',
+        'Deposito Descartable', 'Deposito General', 'Dermatologia', 'Diagnostico Por Imagenes',
+        'Dira', 'Direccion Administrativa', 'Direccion Asociada Area Tecnica',
+        'Direccion Asociada Medico Quirurgica', 'Direccion Ejecutiva', 'Direccion Salud Mental',
+        'Dispositivo Artistico Cultural', 'Docencia E Investigacion',
+        'Donacion Fundacion Florencio Perez', 'Emergencia', 'En Guarda Patrimoniales',
+        'Enfermeria', 'Epidemiologia', 'Estadistica', 'Estadistica Central',
+        'Estadistica Pabellon V', 'Esterilizacion', 'Farmacia', 'Gastroenterologia',
+        'Gerenciamiento De Camas', 'Hemoterapia', 'Infancias Y Juventudes', 'Infectologia',
+        'Informatica', 'Infraestructura Y Mantenimiento', 'Intendencia', 'Jardin Maternal',
+        'Laboratorio', 'Lasegue', 'Legales', 'Limpieza', 'Mesa De Entrada',
+        'Neumonologia Y Oftalmologia', 'Neurocirugia', 'Neuropsicologia', 'Odontologia',
+        'Oncologia', 'Patologia', 'Patrimoniales', 'Pediatria Y Neonatologia', 'Penfield',
+        'Percial', 'Podologia Y Peluqueria', 'Polo Educativo', 'Pre Alta', 'Quirofano',
+        'RRHH', 'Recuperacion Clinica', 'Registro Civil', 'Rehabilitacion Fisica Y Kinesiologia',
+        'Rehabilitacion Salud Mental Direccion', 'Reumatologia Y Oftalmologia',
+        'SAC', 'SAM', 'SAMO Contable', 'SAMO Facturacion',
+        'SAP (Servicio De Area Programatica Y Redes De Salud)', 'SGU', 'Sala De Endoscopia',
+        'Sala F', 'Sala G', 'Seguridad E Higiene', 'Servicio De Psicologia',
+        'Servicio Rehabilitacion Larga Distancia', 'Servicio Social', 'Sumar',
+        'Tocoginecologia', 'Toxicologia', 'Traumatologia', 'U.T.I.', 'UCAC',
+        'Vacunacion', 'Vigilancia',
+    ]
+    extras = list(ServicioExtra.objects.values_list('nombre', flat=True))
+    todos_servicios = sorted(set(SERVICIOS_FIJOS + extras))
+
     ctx = permisos_context(request.user)
     ctx.update({
         "bienes": page_obj.object_list,
         "scope": scope,
+        "servicios_seleccionados": servicios_seleccionados,
+        "todos_servicios": todos_servicios,
         "paginator": paginator,
         "page_obj": page_obj,
         "is_paginated": paginator.num_pages > 1,
@@ -1059,6 +1240,7 @@ def reportes_view(request):
         "next_page": next_page,
         "querystring": querystring,
     })
+
     return render(request, "reportes.html", ctx)
  
  
@@ -1391,7 +1573,11 @@ def editar_bien(request, pk):
         form = BienPatrimonialForm(instance=bien)
  
     context = permisos_context(request.user)
-    context.update({"form": form, "bien": bien})
+    context.update({
+        "form": form,
+        "bien": bien,
+        "servicios_extra": ServicioExtra.objects.all(),
+    })
     return render(request, "bienes/editar_bien.html", context)
  
  

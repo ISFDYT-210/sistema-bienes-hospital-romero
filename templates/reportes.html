@@ -6,23 +6,46 @@
 <div class="container py-4">
   <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
     <h2 class="m-0">Reporte de Bienes Patrimoniales</h2>
-    <div class="btn-inst-group">
-      <form method="get" class="d-flex align-items-center gap-2">
-        <select name="scope" class="form-select" style="min-width: 170px; height: 38px;">
-          <option value="24h" {% if scope == '24h' %}selected{% endif %}>Últimas 24 h</option>
-          <option value="all" {% if scope == 'all' %}selected{% endif %}>Todos</option>
-        </select>
-        <button class="btn-inst-filter" type="submit">
-          <i class="fa-solid fa-rotate"></i> Actualizar
-        </button>
-      </form>
-      <a class="btn-inst-primary"
-         href="{% url 'reportes_pdf' %}?scope={{ scope|default:'24h' }}">
-        <i class="fa-solid fa-file-pdf"></i>
-        <span>Exportar PDF</span>
-      </a>
-    </div>
   </div>
+
+  <form method="get" class="d-flex flex-wrap gap-2 align-items-start mb-2">
+    <!-- Desplegable de horas -->
+    <select name="scope" class="form-select" style="min-width: 130px; max-width: 150px;">
+      <option value="24h" {% if scope == '24h' %}selected{% endif %}>Ultimas 24 h</option>
+      <option value="12h" {% if scope == '12h' %}selected{% endif %}>Ultimas 12 h</option>
+      <option value="6h"  {% if scope == '6h'  %}selected{% endif %}>Ultimas 6 h</option>
+      <option value="all" {% if scope == 'all' %}selected{% endif %}>Historico</option>
+    </select>
+
+    <!-- Desplegable de servicios con Select2 - ordenado alfabéticamente -->
+    <select name="servicio" id="filtro-servicio" class="form-select" style="min-width: 280px;" multiple>
+      {% for s in todos_servicios %}
+      <option value="{{ s }}" {% if s in servicios_seleccionados %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+
+    <!-- Botones -->
+    <button class="btn btn-primary d-flex align-items-center gap-2 px-3" style="min-width: 160px;" type="submit">
+      <i class="fa-solid fa-rotate"></i>
+      <span>Buscar</span>
+    </button>
+    <a class="btn btn-danger d-flex align-items-center justify-content-center gap-2 px-3"
+       style="min-width: 160px;"
+       href="{% url 'reportes_pdf' %}?scope={{ scope|default:'24h' }}{% for s in servicios_seleccionados %}&servicio={{ s }}{% endfor %}">
+      <i class="fa-solid fa-file-pdf"></i>
+      <span>Exportar PDF</span>
+    </a>
+  </form>
+
+  <!-- Cuadro de servicios seleccionados -->
+  {% if servicios_seleccionados %}
+  <div id="cuadro-servicios" class="border rounded p-2 mb-3 bg-light" style="min-height: 36px; overflow-y: auto;">
+    <small class="text-muted me-2">Servicios seleccionados:</small>
+    {% for s in servicios_seleccionados %}
+      <span class="badge bg-primary me-1 mb-1">{{ s }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
 
   <p class="text-muted">Rango: <strong>{{ rango_desc }}</strong></p>
 
@@ -104,7 +127,6 @@
   {% endif %}
 
 
-  <!-- Notificaciones del período (si scope=24h) -->
   {% if notifs %}
   <h5 class="mt-4">Acciones registradas (notificaciones)</h5>
   <div class="table-responsive">
@@ -127,4 +149,17 @@
   </div>
   {% endif %}
 </div>
+
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+  $(document).ready(function() {
+    $('#filtro-servicio').select2({
+      placeholder: "Buscar servicio...",
+      allowClear: true,
+      width: '100%'
+    });
+  });
+</script>
 {% endblock %}
