@@ -666,6 +666,28 @@ def reportes_pdf(request):
         )
         notifs = Notificacion.objects.filter(fecha__gte=since_dt).order_by("-fecha")
         rango_desc = "Últimas 24 horas"
+    elif scope == "12h":
+        since_dt = now - timedelta(hours=12)
+        since_date = since_dt.date()
+        bienes = (
+            BienPatrimonial.objects
+            .select_related("expediente")
+            .filter(Q(fecha_adquisicion__gte=since_date) | Q(fecha_baja__gte=since_date))
+            .order_by("-fecha_baja", "-fecha_adquisicion", "pk")
+        )
+        notifs = Notificacion.objects.filter(fecha__gte=since_dt).order_by("-fecha")
+        rango_desc = "Últimas 12 horas"
+    elif scope == "6h":
+        since_dt = now - timedelta(hours=6)
+        since_date = since_dt.date()
+        bienes = (
+            BienPatrimonial.objects
+            .select_related("expediente")
+            .filter(Q(fecha_adquisicion__gte=since_date) | Q(fecha_baja__gte=since_date))
+            .order_by("-fecha_baja", "-fecha_adquisicion", "pk")
+        )
+        notifs = Notificacion.objects.filter(fecha__gte=since_dt).order_by("-fecha")
+        rango_desc = "Últimas 6 horas"
     else:
         bienes = (
             BienPatrimonial.objects
@@ -675,12 +697,52 @@ def reportes_pdf(request):
         notifs = Notificacion.objects.none()
         rango_desc = "Todos"
 
+    servicios_seleccionados = request.GET.getlist("servicio")
+    if servicios_seleccionados:
+        q_services = Q()
+        for s in servicios_seleccionados:
+            val = s.strip()
+            if "samo" in val.lower():
+                q_services |= Q(servicios__icontains="SAMO") | Q(servicios__icontains="Samo")
+            else:
+                import unicodedata
+                def clean_word(w):
+                    nfkd = unicodedata.normalize('NFKD', w)
+                    return "".join([c for c in nfkd if not unicodedata.combining(c)]).lower()
+                words = [clean_word(w) for w in val.split() if len(w) > 2 and w.lower() not in ["de", "la", "el", "los", "las", "del"]]
+                if words:
+                    q_words = Q()
+                    for w in words:
+                        q_words |= Q(servicios__icontains=w)
+                    q_services |= q_words
+                else:
+                    q_services |= Q(servicios__icontains=val)
+        bienes = bienes.filter(q_services)
+
+    q = (request.GET.get("q") or "").strip()
+    if q:
+        bienes = bienes.filter(
+            Q(clave_unica__icontains=q)
+            | Q(descripcion__icontains=q)
+            | Q(observaciones__icontains=q)
+            | Q(numero_identificacion__icontains=q)
+            | Q(servicios__icontains=q)
+            | Q(cuenta_codigo__icontains=q)
+            | Q(nomenclatura_bienes__icontains=q)
+            | Q(numero_serie__icontains=q)
+            | Q(origen__icontains=q)
+            | Q(estado__icontains=q)
+            | Q(expediente__numero_expediente__icontains=q)
+            | Q(expediente__numero_compra__icontains=q)
+        )
+
     ctx = {
         "bienes": bienes,
         "notifs": notifs,
         "rango_desc": rango_desc,
         "generado_en": now,
         "usuario": request.user,
+        "servicios_seleccionados": servicios_seleccionados,
         **permisos_context(request.user),
     }
 
@@ -750,6 +812,8 @@ def reportes_pdf(request):
         elems = []
         title = f"Reporte de Bienes Patrimoniales – {rango_desc}"
         meta = f"Generado: {timezone.localtime(now).strftime('%d/%m/%Y %H:%M')} · Usuario: {request.user.username}"
+        if servicios_seleccionados:
+            meta += f" · Servicios: {', '.join(servicios_seleccionados)}"
         elems.append(Paragraph(title, title_style))
         elems.append(Paragraph(meta, meta_style))
         elems.append(Spacer(1, 8))
@@ -840,17 +904,34 @@ def agregar_servicio(request):
     if request.method == "POST":
         nombre = (request.POST.get("nombre") or "").strip().title()
         SERVICIOS_FIJOS = [
-            "Direccion Asociada Area Tecnica", "SAP (Servicio de Area Programatica y Redes de Salud)",
-            "Departamento Sistema de Informacion - SAMO Turnos y Estadistica", "Epidemiologia",
-            "Jardin Maternal", "Recuperacion Clinica", "Farmacia", "Direccion Asociada Medico Quirurgica",
-            "Percial", "Cirugia", "Hemoterapia", "Clinica", "Patologia", "Toxicologia",
-            "Esterilizacion", "Neuropsicologia", "Seguridad e Higiene", "U.T.I.",
-            "Area Limpieza Hospitalaria", "Emergencia", "Podologia y Peluqueria", "Infectologia",
-            "Odontologia", "Consultorios", "Cardiologia", "Gerenciamiento de Camas", "Neurologia",
-            "Gastroenterologia", "Rehabilitacion Fisica y Kinesiologia", "Neonatologia", "Laboratorio",
-            "Sala Gestion de Usuarios", "Diagnostico por Imagenes", "Reumatologia y Oftalmologia",
-            "Costurero", "CAPER", "Quirofano", "Consejeria", "Traumatologia", "Vacunacion",
-            "Pediatria y Neonatologia", "Dermatologia", "Tocoginecologia", "Oncologia",
+            "Apoyo A La Comunidad", "Area Guardia", "Area Limpieza Hospitalaria",
+            "Area Parque Cultural", "Arquitectura", "CAPER", "Camilleros", "Cardiologia",
+            "Charcot", "Cirugia", "Clinica", "Cocina", "Compras", "Conmutador", "Consejeria",
+            "Consultorio De Gastroenterologia", "Consultorio Externo Salud Mental",
+            "Consultorios Externos Pab V", "Contable", "Costurero",
+            "Cud Y Servicios De Consumos Problematicos", "Departamento De Enfermerias Supervision",
+            "Departamento Sistema De Informacion - Samo Turnos Y Estadistica",
+            "Deposito Descartable", "Deposito General", "Dermatologia", "Diagnostico Por Imagenes",
+            "Dira", "Direccion Administrativa", "Direccion Asociada Area Tecnica",
+            "Direccion Asociada Medico Quirurgica", "Direccion Ejecutiva", "Direccion Salud Mental",
+            "Dispositivo Artistico Cultural", "Docencia E Investigacion",
+            "Donacion Fundacion Florencio Perez", "Emergencia", "En Guarda Patrimoniales",
+            "Enfermeria", "Epidemiologia", "Estadistica", "Estadistica Central",
+            "Estadistica Pabellon V", "Esterilizacion", "Farmacia", "Gastroenterologia",
+            "Gerenciamiento De Camas", "Hemoterapia", "Infancias Y Juventudes", "Infectologia",
+            "Informatica", "Infraestructura Y Mantenimiento", "Intendencia", "Jardin Maternal",
+            "Laboratorio", "Lasegue", "Legales", "Limpieza", "Mesa De Entrada",
+            "Neumonologia Y Oftalmologia", "Neurocirugia", "Neuropsicologia", "Odontologia",
+            "Oncologia", "Patologia", "Patrimoniales", "Pediatria Y Neonatologia", "Penfield",
+            "Percial", "Podologia Y Peluqueria", "Polo Educativo", "Pre Alta", "Quirofano",
+            "RRHH", "Recuperacion Clinica", "Registro Civil", "Rehabilitacion Fisica Y Kinesiologia",
+            "Rehabilitacion Salud Mental Direccion", "Reumatologia Y Oftalmologia",
+            "SAC", "SAM", "SAMO Contable", "SAMO Facturacion",
+            "SAP (Servicio De Area Programatica Y Redes De Salud)", "SGU", "Sala De Endoscopia",
+            "Sala F", "Sala G", "Seguridad E Higiene", "Servicio De Psicologia",
+            "Servicio Rehabilitacion Larga Distancia", "Servicio Social", "Sumar",
+            "Tocoginecologia", "Toxicologia", "Traumatologia", "U.T.I.", "UCAC",
+            "Vacunacion", "Vigilancia",
         ]
         ya_existe_fijo = any(nombre.lower() == s.lower() for s in SERVICIOS_FIJOS)
         ya_existe_extra = ServicioExtra.objects.filter(nombre__iexact=nombre).exists()
@@ -919,7 +1000,42 @@ def reportes_view(request):
 
     servicios_seleccionados = request.GET.getlist("servicio")
     if servicios_seleccionados:
-        bienes = bienes.filter(servicios__in=servicios_seleccionados)
+        q_services = Q()
+        for s in servicios_seleccionados:
+            val = s.strip()
+            if "samo" in val.lower():
+                q_services |= Q(servicios__icontains="SAMO") | Q(servicios__icontains="Samo")
+            else:
+                import unicodedata
+                def clean_word(w):
+                    nfkd = unicodedata.normalize('NFKD', w)
+                    return "".join([c for c in nfkd if not unicodedata.combining(c)]).lower()
+                words = [clean_word(w) for w in val.split() if len(w) > 2 and w.lower() not in ["de", "la", "el", "los", "las", "del"]]
+                if words:
+                    q_words = Q()
+                    for w in words:
+                        q_words |= Q(servicios__icontains=w)
+                    q_services |= q_words
+                else:
+                    q_services |= Q(servicios__icontains=val)
+        bienes = bienes.filter(q_services)
+
+    q = (request.GET.get("q") or "").strip()
+    if q:
+        bienes = bienes.filter(
+            Q(clave_unica__icontains=q)
+            | Q(descripcion__icontains=q)
+            | Q(observaciones__icontains=q)
+            | Q(numero_identificacion__icontains=q)
+            | Q(servicios__icontains=q)
+            | Q(cuenta_codigo__icontains=q)
+            | Q(nomenclatura_bienes__icontains=q)
+            | Q(numero_serie__icontains=q)
+            | Q(origen__icontains=q)
+            | Q(estado__icontains=q)
+            | Q(expediente__numero_expediente__icontains=q)
+            | Q(expediente__numero_compra__icontains=q)
+        )
 
     try:
         per_page = int(request.GET.get("per_page") or 15)
@@ -966,17 +1082,34 @@ def reportes_view(request):
 
     from core.models.servicio_extra import ServicioExtra
     SERVICIOS_FIJOS = [
-        'Area Limpieza Hospitalaria', 'CAPER', 'Cardiologia', 'Cirugia', 'Clinica',
-        'Consejeria', 'Consultorios', 'Departamento Sistema De Informacion - Samo Turnos Y Estadistica',
-        'Dermatologia', 'Diagnostico Por Imagenes', 'Direccion Asociada Area Tecnica',
-        'Direccion Asociada Medico Quirurgica', 'Emergencia', 'Epidemiologia', 'Esterilizacion',
-        'Farmacia', 'Gastroenterologia', 'Gerenciamiento De Camas', 'Hemoterapia', 'Infectologia',
-        'Jardin Maternal', 'Laboratorio', 'Neonatologia', 'Neurologia', 'Neuropsicologia',
-        'Odontologia', 'Oncologia', 'Patologia', 'Pediatria Y Neonatologia', 'Percial',
-        'Podologia Y Peluqueria', 'Quirofano', 'Recuperacion Clinica',
-        'Rehabilitacion Fisica Y Kinesiologia', 'Reumatologia Y Oftalmologia',
-        'SAP (Servicio De Area Programatica Y Redes De Salud)', 'Sala Gestion De Usuarios',
-        'Seguridad E Higiene', 'Tocoginecologia', 'Toxicologia', 'Traumatologia', 'U.T.I.', 'Vacunacion',
+        "Apoyo A La Comunidad", "Area Guardia", "Area Limpieza Hospitalaria",
+        "Area Parque Cultural", "Arquitectura", "CAPER", "Camilleros", "Cardiologia",
+        "Charcot", "Cirugia", "Clinica", "Cocina", "Compras", "Conmutador", "Consejeria",
+        "Consultorio De Gastroenterologia", "Consultorio Externo Salud Mental",
+        "Consultorios Externos Pab V", "Contable", "Costurero",
+        "Cud Y Servicios De Consumos Problematicos", "Departamento De Enfermerias Supervision",
+        "Departamento Sistema De Informacion - Samo Turnos Y Estadistica",
+        "Deposito Descartable", "Deposito General", "Dermatologia", "Diagnostico Por Imagenes",
+        "Dira", "Direccion Administrativa", "Direccion Asociada Area Tecnica",
+        "Direccion Asociada Medico Quirurgica", "Direccion Ejecutiva", "Direccion Salud Mental",
+        "Dispositivo Artistico Cultural", "Docencia E Investigacion",
+        "Donacion Fundacion Florencio Perez", "Emergencia", "En Guarda Patrimoniales",
+        "Enfermeria", "Epidemiologia", "Estadistica", "Estadistica Central",
+        "Estadistica Pabellon V", "Esterilizacion", "Farmacia", "Gastroenterologia",
+        "Gerenciamiento De Camas", "Hemoterapia", "Infancias Y Juventudes", "Infectologia",
+        "Informatica", "Infraestructura Y Mantenimiento", "Intendencia", "Jardin Maternal",
+        "Laboratorio", "Lasegue", "Legales", "Limpieza", "Mesa De Entrada",
+        "Neumonologia Y Oftalmologia", "Neurocirugia", "Neuropsicologia", "Odontologia",
+        "Oncologia", "Patologia", "Patrimoniales", "Pediatria Y Neonatologia", "Penfield",
+        "Percial", "Podologia Y Peluqueria", "Polo Educativo", "Pre Alta", "Quirofano",
+        "RRHH", "Recuperacion Clinica", "Registro Civil", "Rehabilitacion Fisica Y Kinesiologia",
+        "Rehabilitacion Salud Mental Direccion", "Reumatologia Y Oftalmologia",
+        "SAC", "SAM", "SAMO Contable", "SAMO Facturacion",
+        "SAP (Servicio De Area Programatica Y Redes De Salud)", "SGU", "Sala De Endoscopia",
+        "Sala F", "Sala G", "Seguridad E Higiene", "Servicio De Psicologia",
+        "Servicio Rehabilitacion Larga Distancia", "Servicio Social", "Sumar",
+        "Tocoginecologia", "Toxicologia", "Traumatologia", "U.T.I.", "UCAC",
+        "Vacunacion", "Vigilancia",
     ]
     extras = list(ServicioExtra.objects.values_list('nombre', flat=True))
     todos_servicios = sorted(set(SERVICIOS_FIJOS + extras))
@@ -985,6 +1118,7 @@ def reportes_view(request):
     ctx.update({
         "bienes": page_obj.object_list,
         "scope": scope,
+        "q": q,
         "servicios_seleccionados": servicios_seleccionados,
         "todos_servicios": todos_servicios,
         "paginator": paginator,
@@ -1876,17 +2010,34 @@ def agregar_servicio_ajax(request):
         return JsonResponse({"ok": False, "error": "El nombre no puede estar vacío."})
 
     SERVICIOS_FIJOS = [
-        "Direccion Asociada Area Tecnica", "SAP (Servicio De Area Programatica Y Redes De Salud)",
-        "Departamento Sistema De Informacion - Samo Turnos Y Estadistica", "Epidemiologia",
-        "Jardin Maternal", "Recuperacion Clinica", "Farmacia", "Direccion Asociada Medico Quirurgica",
-        "Percial", "Cirugia", "Hemoterapia", "Clinica", "Patologia", "Toxicologia",
-        "Esterilizacion", "Neuropsicologia", "Seguridad E Higiene", "U.T.I.",
-        "Area Limpieza Hospitalaria", "Emergencia", "Podologia Y Peluqueria", "Infectologia",
-        "Odontologia", "Consultorios", "Cardiologia", "Gerenciamiento De Camas", "Neurologia",
-        "Gastroenterologia", "Rehabilitacion Fisica Y Kinesiologia", "Neonatologia", "Laboratorio",
-        "Sala Gestion De Usuarios", "Diagnostico Por Imagenes", "Reumatologia Y Oftalmologia",
-        "Costurero", "CAPER", "Quirofano", "Consejeria", "Traumatologia", "Vacunacion",
-        "Pediatria Y Neonatologia", "Dermatologia", "Tocoginecologia", "Oncologia",
+        "Apoyo A La Comunidad", "Area Guardia", "Area Limpieza Hospitalaria",
+        "Area Parque Cultural", "Arquitectura", "CAPER", "Camilleros", "Cardiologia",
+        "Charcot", "Cirugia", "Clinica", "Cocina", "Compras", "Conmutador", "Consejeria",
+        "Consultorio De Gastroenterologia", "Consultorio Externo Salud Mental",
+        "Consultorios Externos Pab V", "Contable", "Costurero",
+        "Cud Y Servicios De Consumos Problematicos", "Departamento De Enfermerias Supervision",
+        "Departamento Sistema De Informacion - Samo Turnos Y Estadistica",
+        "Deposito Descartable", "Deposito General", "Dermatologia", "Diagnostico Por Imagenes",
+        "Dira", "Direccion Administrativa", "Direccion Asociada Area Tecnica",
+        "Direccion Asociada Medico Quirurgica", "Direccion Ejecutiva", "Direccion Salud Mental",
+        "Dispositivo Artistico Cultural", "Docencia E Investigacion",
+        "Donacion Fundacion Florencio Perez", "Emergencia", "En Guarda Patrimoniales",
+        "Enfermeria", "Epidemiologia", "Estadistica", "Estadistica Central",
+        "Estadistica Pabellon V", "Esterilizacion", "Farmacia", "Gastroenterologia",
+        "Gerenciamiento De Camas", "Hemoterapia", "Infancias Y Juventudes", "Infectologia",
+        "Informatica", "Infraestructura Y Mantenimiento", "Intendencia", "Jardin Maternal",
+        "Laboratorio", "Lasegue", "Legales", "Limpieza", "Mesa De Entrada",
+        "Neumonologia Y Oftalmologia", "Neurocirugia", "Neuropsicologia", "Odontologia",
+        "Oncologia", "Patologia", "Patrimoniales", "Pediatria Y Neonatologia", "Penfield",
+        "Percial", "Podologia Y Peluqueria", "Polo Educativo", "Pre Alta", "Quirofano",
+        "RRHH", "Recuperacion Clinica", "Registro Civil", "Rehabilitacion Fisica Y Kinesiologia",
+        "Rehabilitacion Salud Mental Direccion", "Reumatologia Y Oftalmologia",
+        "SAC", "SAM", "SAMO Contable", "SAMO Facturacion",
+        "SAP (Servicio De Area Programatica Y Redes De Salud)", "SGU", "Sala De Endoscopia",
+        "Sala F", "Sala G", "Seguridad E Higiene", "Servicio De Psicologia",
+        "Servicio Rehabilitacion Larga Distancia", "Servicio Social", "Sumar",
+        "Tocoginecologia", "Toxicologia", "Traumatologia", "U.T.I.", "UCAC",
+        "Vacunacion", "Vigilancia",
     ]
 
     ya_existe_fijo = any(nombre.lower() == s.lower() for s in SERVICIOS_FIJOS)
@@ -1908,17 +2059,34 @@ def agregar_servicio(request):
     if request.method == "POST":
         nombre = (request.POST.get("nombre") or "").strip().title()
         SERVICIOS_FIJOS = [
-            "Direccion Asociada Area Tecnica", "SAP (Servicio de Area Programatica y Redes de Salud)",
-            "Departamento Sistema de Informacion - SAMO Turnos y Estadistica", "Epidemiologia",
-            "Jardin Maternal", "Recuperacion Clinica", "Farmacia", "Direccion Asociada Medico Quirurgica",
-            "Percial", "Cirugia", "Hemoterapia", "Clinica", "Patologia", "Toxicologia",
-            "Esterilizacion", "Neuropsicologia", "Seguridad e Higiene", "U.T.I.",
-            "Area Limpieza Hospitalaria", "Emergencia", "Podologia y Peluqueria", "Infectologia",
-            "Odontologia", "Consultorios", "Cardiologia", "Gerenciamiento de Camas", "Neurologia",
-            "Gastroenterologia", "Rehabilitacion Fisica y Kinesiologia", "Neonatologia", "Laboratorio",
-            "Sala Gestion de Usuarios", "Diagnostico por Imagenes", "Reumatologia y Oftalmologia",
-            "Costurero", "CAPER", "Quirofano", "Consejeria", "Traumatologia", "Vacunacion",
-            "Pediatria y Neonatologia", "Dermatologia", "Tocoginecologia", "Oncologia",
+            "Apoyo A La Comunidad", "Area Guardia", "Area Limpieza Hospitalaria",
+            "Area Parque Cultural", "Arquitectura", "CAPER", "Camilleros", "Cardiologia",
+            "Charcot", "Cirugia", "Clinica", "Cocina", "Compras", "Conmutador", "Consejeria",
+            "Consultorio De Gastroenterologia", "Consultorio Externo Salud Mental",
+            "Consultorios Externos Pab V", "Contable", "Costurero",
+            "Cud Y Servicios De Consumos Problemacion", "Departamento De Enfermerias Supervision",
+            "Departamento Sistema De Informacion - Samo Turnos Y Estadistica",
+            "Deposito Descartable", "Deposito General", "Dermatologia", "Diagnostico Por Imagenes",
+            "Dira", "Direccion Administrativa", "Direccion Asociada Area Tecnica",
+            "Direccion Asociada Medico Quirurgica", "Direccion Ejecutiva", "Direccion Salud Mental",
+            "Dispositivo Artistico Cultural", "Docencia E Investigacion",
+            "Donacion Fundacion Florencio Perez", "Emergencia", "En Guarda Patrimoniales",
+            "Enfermeria", "Epidemiologia", "Estadistica", "Estadistica Central",
+            "Estadistica Pabellon V", "Esterilizacion", "Farmacia", "Gastroenterologia",
+            "Gerenciamiento De Camas", "Hemoterapia", "Infancias Y Juventudes", "Infectologia",
+            "Informatica", "Infraestructura Y Mantenimiento", "Intendencia", "Jardin Maternal",
+            "Laboratorio", "Lasegue", "Legales", "Limpieza", "Mesa De Entrada",
+            "Neumonologia Y Oftalmologia", "Neurocirugia", "Neuropsicologia", "Odontologia",
+            "Oncologia", "Patologia", "Patrimoniales", "Pediatria Y Neonatologia", "Penfield",
+            "Percial", "Podologia Y Peluqueria", "Polo Educativo", "Pre Alta", "Quirofano",
+            "RRHH", "Recuperacion Clinica", "Registro Civil", "Rehabilitacion Fisica Y Kinesiologia",
+            "Rehabilitacion Salud Mental Direccion", "Reumatologia Y Oftalmologia",
+            "SAC", "SAM", "SAMO Contable", "SAMO Facturacion",
+            "SAP (Servicio De Area Programatica Y Redes De Salud)", "SGU", "Sala De Endoscopia",
+            "Sala F", "Sala G", "Seguridad E Higiene", "Servicio De Psicologia",
+            "Servicio Rehabilitacion Larga Distancia", "Servicio Social", "Sumar",
+            "Tocoginecologia", "Toxicologia", "Traumatologia", "U.T.I.", "UCAC",
+            "Vacunacion", "Vigilancia",
         ]
         ya_existe_fijo = any(nombre.lower() == s.lower() for s in SERVICIOS_FIJOS)
         ya_existe_extra = ServicioExtra.objects.filter(nombre__iexact=nombre).exists()
