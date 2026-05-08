@@ -1634,7 +1634,7 @@ def carga_masiva_bienes(request):
                             cantidad = to_int1(get_first(row, ["cantidad"]))
                             
                             serv_raw = s(get_first(row, ["servicios", "servicio", "sector"]) or servicio_archivo)
-                            servicios = serv_raw if serv_raw else "NO"
+                            servicios = (serv_raw if serv_raw else "NO")[:200]
 
                             fecha_alta = parse_date_any(get_first(row, ["fecha alta", "fecha de alta"])) or date.today()
                             fecha_baja = parse_date_any(get_first(row, ["fecha de baja"]))
@@ -1645,29 +1645,31 @@ def carga_masiva_bienes(request):
 
                             expediente_obj = None
                             if nro_exp and nro_exp.upper() != "NO":
-                                expediente_obj, _ = Expediente.objects.get_or_create(numero_expediente=nro_exp)
+                                expediente_obj, _ = Expediente.objects.get_or_create(numero_expediente=nro_exp[:50])
                                 if nro_compra and nro_compra.upper() != "NO":
-                                    expediente_obj.numero_compra = nro_compra
+                                    expediente_obj.numero_compra = nro_compra[:50]
                                     expediente_obj.save(update_fields=["numero_compra"])
 
-                            nombre_bien = descripcion[:200] if descripcion else (nro_serie if nro_serie != "NO" else "SIN NOMBRE")
-                            numero_id_val = (numero_id or "").strip() or None
+                            nombre_bien = (descripcion[:200] if descripcion else (nro_serie[:200] if nro_serie != "NO" else "NO"))
+                            numero_id_val = ((numero_id or "").strip() or None)
+                            if numero_id_val:
+                                numero_id_val = numero_id_val[:50]
 
                             defaults = {
                                 "nombre": nombre_bien,
                                 "descripcion": descripcion or "NO",
                                 "cantidad": cantidad,
                                 "servicios": servicios,
-                                "numero_serie": nro_serie,
+                                "numero_serie": nro_serie[:100],
                                 "numero_identificacion": numero_id_val,
-                                "cuenta_codigo": cuenta_cod,
-                                "nomenclatura_bienes": nomencl,
+                                "cuenta_codigo": cuenta_cod[:20],
+                                "nomenclatura_bienes": nomencl[:200],
                                 "observaciones": observ,
                                 "valor_adquisicion": precio,
                                 "fecha_adquisicion": fecha_alta,
                                 "fecha_baja": fecha_baja,
                                 "expediente": expediente_obj,
-                                "numero_compra": nro_compra if nro_compra and nro_compra.upper() != "NO" else "",
+                                "numero_compra": (nro_compra if nro_compra and nro_compra.upper() != "NO" else "NO")[:50],
                             }
                             if origen_val: defaults["origen"] = origen_val
                             if estado_val: defaults["estado"] = estado_val
