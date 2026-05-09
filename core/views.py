@@ -124,6 +124,16 @@ def login_view(request):
         tipo_usuario = (request.POST.get("tipo_usuario") or tipo_default or "").strip()
         user = authenticate(request, username=usuario, password=contrasena)
 
+        # Si falla con username, intentar con email
+        if user is None and "@" in usuario:
+            from django.contrib.auth import get_user_model
+            UserModel = get_user_model()
+            try:
+                u = UserModel.objects.get(email__iexact=usuario)
+                user = authenticate(request, username=u.username, password=contrasena)
+            except (UserModel.DoesNotExist, UserModel.MultipleObjectsReturned):
+                user = None
+
         def _rerender_error(msg):
             messages.error(request, msg)
             ctx = {
