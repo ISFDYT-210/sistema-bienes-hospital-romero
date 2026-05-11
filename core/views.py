@@ -1,11 +1,12 @@
 from django.contrib.auth import authenticate, login, logout, get_user_model
 import pandas as pd
+import hashlib
 from datetime import date, timedelta
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from core.forms import CargaMasivaForm, BienPatrimonialForm, OperadorForm
-from core.models import BienPatrimonial
+from core.models import BienPatrimonial, ServicioExtra
 from django.db.models import Q, F
 from django.views.decorators.http import require_POST
 from django.db import transaction, IntegrityError
@@ -73,7 +74,29 @@ def permisos_context(user):
         "puede_gestionar_operadores": es_admin,
         "notificaciones": notificaciones,
         "notificaciones_count": notificaciones_count,
+        "tema_oscuro": getattr(user, "tema_oscuro", False),
     }
+
+
+# ============================
+# TEMA / PREFERENCIAS
+# ============================
+
+@login_required
+@require_POST
+def actualizar_tema(request):
+    try:
+        import json
+        data = json.loads(request.body)
+        tema_oscuro = data.get("tema_oscuro", False)
+        
+        user = request.user
+        user.tema_oscuro = tema_oscuro
+        user.save(update_fields=["tema_oscuro"])
+        
+        return JsonResponse({"status": "ok", "tema_oscuro": user.tema_oscuro})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
 
 # ============================
@@ -113,7 +136,7 @@ def login_view(request):
             return render(request, "login.html", ctx, status=401)
 
         if user is None:
-            return _rerender_error("Usuario o contraseña incorrectos")
+            return _rerender_error("Usuario o contraseña incorrectos. Formato requerido (Ej: Hospit@l1)")
 
         if not tipo_usuario:
             if getattr(user, "is_superuser", False):
@@ -208,7 +231,10 @@ def bienes(request):
         form = BienPatrimonialForm()
 
     context = perms
-    context.update({"form": form})
+    context.update({
+        "form": form,
+        "servicios_extra": ServicioExtra.objects.all(),
+})
     return render(request, "bienes.html", context)
 
 
@@ -310,6 +336,7 @@ def alta_operadores(request):
 
         form = OperadorForm(request.POST)
         if not form.is_valid():
+            messages.error(request, "Por favor, revisá los errores en el formulario.")
             return render(
                 request,
                 "alta_operadores.html",
@@ -325,7 +352,17 @@ def alta_operadores(request):
             )
 
         numero_doc = form.cleaned_data["dni"]
-
+ 
+        # Usamos los datos validados del form en su lugar
+        numero_doc = form.cleaned_data.get("dni")
+        email      = form.cleaned_data.get("email")
+        nombre     = form.cleaned_data.get("nombre")
+        apellido   = form.cleaned_data.get("apellido")
+        pais       = form.cleaned_data.get("pais")
+        estado     = (request.POST.get("estado") or "habilitado").strip()
+        password   = form.cleaned_data.get("password")
+ 
+        # Validación DNI duplicado
         if numero_doc and Usuario.objects.filter(numero_doc=numero_doc).exists():
             messages.error(request, f"Ya existe un operador con el DNI {numero_doc}.")
             return redirect("alta_operadores")
@@ -391,13 +428,16 @@ def alta_operadores(request):
                 "alta_operadores.html",
                 {"usar_operador_model": False, "form": form},
             )
+ 
+        rol_display = form.cleaned_data.get("tipo_usuario", "operador").capitalize()
 
         Notificacion.objects.create(
             usuario=request.user,
-            mensaje=f"Se creó el operador '{operador.username}'.",
+            mensaje=f"Se creó el {rol_display.lower()} '{operador.username}'.",
             leida=False,
         )
-        messages.success(request, f"Operador {nombre} {apellido} creado. Usuario: {operador.username}")
+ 
+        messages.success(request, f"{rol_display} {nombre} {apellido} creado. Usuario: {operador.username}")
         return redirect("operadores")
 
     form = OperadorForm(initial={
@@ -423,7 +463,7 @@ def editar_operador(request, pk):
         nombre = " ".join((request.POST.get("nombre") or "").strip().split())
         apellido = " ".join((request.POST.get("apellido") or "").strip().split())
         email = (request.POST.get("email") or "").strip()
-        estado = (request.POST.get("estado") or "habilitado").strip()
+        # estado = (request.POST.get("estado") or "habilitado").strip()
         pais = (request.POST.get("pais") or "").strip()
         tipo_usuario = (request.POST.get("tipo_usuario") or "operador").strip()
         password = (request.POST.get("password") or "").strip()
@@ -455,11 +495,29 @@ def editar_operador(request, pk):
         if operador.email != email_normalizado:
             operador.email = email_normalizado
             hubo_cambio = True
-
-        is_active_nuevo = estado == "habilitado"
-        if operador.is_active != is_active_nuevo:
-            operador.is_active = is_active_nuevo
-            hubo_cambio = True
+        else:
+            operador.email = email_normalizado
+  
+        if hasattr(operador, "estado"):
+            if operador.estado != estado:
+                operador.estado = estado
+                hubo_cambio = True
+            else:
+                operador.estado = estado
+ 
+        if hasattr(operador, "pais"):
+            if operador.pais != pais:
+                operador.pais = pais
+                hubo_cambio = True
+            else:
+                operador.pais = pais
+ 
+        if hasattr(operador, "numero_doc"):
+            if operador.numero_doc != numero_doc:
+                operador.numero_doc = numero_doc
+                hubo_cambio = True
+            else:
+                operador.numero_doc = numero_doc
 
         if hasattr(operador, "estado") and operador.estado != estado:
             operador.estado = estado
@@ -483,12 +541,22 @@ def editar_operador(request, pk):
 
         if hubo_cambio:
             operador.save()
-            messages.success(request, f"✅ Operador '{operador.username}' actualizado correctamente.", extra_tags='editar')
+            rol_display = form.cleaned_data.get("tipo_usuario", getattr(operador, "tipo_usuario", "operador")).capitalize()
+            
             try:
-                crear_notificacion(request.user, f"Se editó el operador '{operador.username}'.")
+                # Usar Notificacion.objects.create para mantener consistencia
+                from core.models.notificacion import Notificacion
+                Notificacion.objects.create(
+                    usuario=request.user,
+                    mensaje=f"Se editó el {rol_display.lower()} '{operador.username}'.",
+                    leida=False,
+                )
             except Exception:
                 pass
-
+            
+            # Solo un mensaje de éxito para evitar duplicados
+            messages.success(request, f"{rol_display} '{operador.username}' actualizado correctamente.", extra_tags='editar')
+ 
         return redirect("operadores")
 
     form = OperadorForm(initial={
@@ -525,17 +593,20 @@ def eliminar_operador(request, pk):
 
     identificador = operador.username
     operador.delete()
+ 
+    rol_display = getattr(operador, "tipo_usuario", "operador").capitalize()
 
     try:
+        from core.models.notificacion import Notificacion
         Notificacion.objects.create(
             usuario=request.user,
-            mensaje=f"Se eliminó el operador '{identificador}'.",
+            mensaje=f"Se eliminó el {rol_display.lower()} '{identificador}'.",
             leida=False,
         )
     except Exception:
         pass
-
-    messages.success(request, f"Operador '{identificador}' eliminado correctamente.")
+ 
+    messages.success(request, f"{rol_display} '{identificador}' eliminado correctamente.")
     return redirect("operadores")
 
 
@@ -559,17 +630,20 @@ def dar_baja_operador(request, pk):
         except Exception:
             pass
     operador.save()
+ 
+    rol_display = getattr(operador, "tipo_usuario", "operador").capitalize()
 
     try:
+        from core.models.notificacion import Notificacion
         Notificacion.objects.create(
             usuario=request.user,
-            mensaje=f"Se dio de baja al operador '{operador.username}'.",
+            mensaje=f"Se dio de baja al {rol_display.lower()} '{operador.username}'.",
             leida=False,
         )
     except Exception:
         pass
-
-    messages.success(request, f"Operador {operador.username} dado de baja correctamente.")
+ 
+    messages.success(request, f"{rol_display} '{operador.username}' dado de baja correctamente.")
     return redirect("operadores")
 
 
@@ -593,6 +667,28 @@ def reportes_pdf(request):
         )
         notifs = Notificacion.objects.filter(fecha__gte=since_dt).order_by("-fecha")
         rango_desc = "Últimas 24 horas"
+    elif scope == "12h":
+        since_dt = now - timedelta(hours=12)
+        since_date = since_dt.date()
+        bienes = (
+            BienPatrimonial.objects
+            .select_related("expediente")
+            .filter(Q(fecha_adquisicion__gte=since_date) | Q(fecha_baja__gte=since_date))
+            .order_by("-fecha_baja", "-fecha_adquisicion", "pk")
+        )
+        notifs = Notificacion.objects.filter(fecha__gte=since_dt).order_by("-fecha")
+        rango_desc = "Últimas 12 horas"
+    elif scope == "6h":
+        since_dt = now - timedelta(hours=6)
+        since_date = since_dt.date()
+        bienes = (
+            BienPatrimonial.objects
+            .select_related("expediente")
+            .filter(Q(fecha_adquisicion__gte=since_date) | Q(fecha_baja__gte=since_date))
+            .order_by("-fecha_baja", "-fecha_adquisicion", "pk")
+        )
+        notifs = Notificacion.objects.filter(fecha__gte=since_dt).order_by("-fecha")
+        rango_desc = "Últimas 6 horas"
     else:
         bienes = (
             BienPatrimonial.objects
@@ -602,12 +698,52 @@ def reportes_pdf(request):
         notifs = Notificacion.objects.none()
         rango_desc = "Todos"
 
+    servicios_seleccionados = request.GET.getlist("servicio")
+    if servicios_seleccionados:
+        q_services = Q()
+        for s in servicios_seleccionados:
+            val = s.strip()
+            if "samo" in val.lower():
+                q_services |= Q(servicios__icontains="SAMO") | Q(servicios__icontains="Samo")
+            else:
+                import unicodedata
+                def clean_word(w):
+                    nfkd = unicodedata.normalize('NFKD', w)
+                    return "".join([c for c in nfkd if not unicodedata.combining(c)]).lower()
+                words = [clean_word(w) for w in val.split() if len(w) > 2 and w.lower() not in ["de", "la", "el", "los", "las", "del"]]
+                if words:
+                    q_words = Q()
+                    for w in words:
+                        q_words |= Q(servicios__icontains=w)
+                    q_services |= q_words
+                else:
+                    q_services |= Q(servicios__icontains=val)
+        bienes = bienes.filter(q_services)
+
+    q = (request.GET.get("q") or "").strip()
+    if q:
+        bienes = bienes.filter(
+            Q(clave_unica__icontains=q)
+            | Q(descripcion__icontains=q)
+            | Q(observaciones__icontains=q)
+            | Q(numero_identificacion__icontains=q)
+            | Q(servicios__icontains=q)
+            | Q(cuenta_codigo__icontains=q)
+            | Q(nomenclatura_bienes__icontains=q)
+            | Q(numero_serie__icontains=q)
+            | Q(origen__icontains=q)
+            | Q(estado__icontains=q)
+            | Q(expediente__numero_expediente__icontains=q)
+            | Q(expediente__numero_compra__icontains=q)
+        )
+
     ctx = {
         "bienes": bienes,
         "notifs": notifs,
         "rango_desc": rango_desc,
         "generado_en": now,
         "usuario": request.user,
+        "servicios_seleccionados": servicios_seleccionados,
         **permisos_context(request.user),
     }
 
@@ -677,12 +813,14 @@ def reportes_pdf(request):
         elems = []
         title = f"Reporte de Bienes Patrimoniales – {rango_desc}"
         meta = f"Generado: {timezone.localtime(now).strftime('%d/%m/%Y %H:%M')} · Usuario: {request.user.username}"
+        if servicios_seleccionados:
+            meta += f" · Servicios: {', '.join(servicios_seleccionados)}"
         elems.append(Paragraph(title, title_style))
         elems.append(Paragraph(meta, meta_style))
         elems.append(Spacer(1, 8))
 
         data = [[
-            P("ID", True), P("Clave", True), P("Descripción", True), P("Servicios", True),
+            P("ID", True), P("Descripción", True), P("Servicios", True),
             P("Estado", True), P("Alta", True), P("Baja", True), P("Valor", True),
         ]]
         for b in bienes:
@@ -691,7 +829,6 @@ def reportes_pdf(request):
             baja = b.fecha_baja.strftime("%d/%m/%Y") if b.fecha_baja else "—"
             data.append([
                 P(b.pk or ""),
-                P(b.clave_unica or "—"),
                 P(b.descripcion or "—"),
                 P(b.servicios or "—"),
                 P(estado),
@@ -702,7 +839,7 @@ def reportes_pdf(request):
 
         page_w, _ = A4
         usable_w = page_w - (doc.leftMargin + doc.rightMargin)
-        base_col_cm = [1.2, 2.0, 9.0, 2.2, 2.0, 2.0, 2.0, 1.6]
+        base_col_cm = [1.2, 11.0, 2.2, 2.0, 2.0, 2.0, 1.6]
         base_col_pts = [w * cm for w in base_col_cm]
         scale = float(usable_w) / float(sum(base_col_pts))
         col_widths = [w * scale for w in base_col_pts]
@@ -759,12 +896,92 @@ def reportes_pdf(request):
 
 
 @login_required
+def agregar_servicio(request):
+    perms = permisos_context(request.user)
+    if not perms["es_admin"]:
+        messages.error(request, "No tienes permisos para acceder a esta página.")
+        return redirect("home_operador")
+
+    if request.method == "POST":
+        nombre = (request.POST.get("nombre") or "").strip().title()
+        SERVICIOS_FIJOS = [
+            "Apoyo A La Comunidad", "Area Guardia", "Area Limpieza Hospitalaria",
+            "Area Parque Cultural", "Arquitectura", "CAPER", "Camilleros", "Cardiologia",
+            "Charcot", "Cirugia", "Clinica", "Cocina", "Compras", "Conmutador", "Consejeria",
+            "Consultorio De Gastroenterologia", "Consultorio Externo Salud Mental",
+            "Consultorios Externos Pab V", "Contable", "Costurero",
+            "Cud Y Servicios De Consumos Problematicos", "Departamento De Enfermerias Supervision",
+            "Departamento Sistema De Informacion - Samo Turnos Y Estadistica",
+            "Deposito Descartable", "Deposito General", "Dermatologia", "Diagnostico Por Imagenes",
+            "Dira", "Direccion Administrativa", "Direccion Asociada Area Tecnica",
+            "Direccion Asociada Medico Quirurgica", "Direccion Ejecutiva", "Direccion Salud Mental",
+            "Dispositivo Artistico Cultural", "Docencia E Investigacion",
+            "Donacion Fundacion Florencio Perez", "Emergencia", "En Guarda Patrimoniales",
+            "Enfermeria", "Epidemiologia", "Estadistica", "Estadistica Central",
+            "Estadistica Pabellon V", "Esterilizacion", "Farmacia", "Gastroenterologia",
+            "Gerenciamiento De Camas", "Hemoterapia", "Infancias Y Juventudes", "Infectologia",
+            "Informatica", "Infraestructura Y Mantenimiento", "Intendencia", "Jardin Maternal",
+            "Laboratorio", "Lasegue", "Legales", "Limpieza", "Mesa De Entrada",
+            "Neumonologia Y Oftalmologia", "Neurocirugia", "Neuropsicologia", "Odontologia",
+            "Oncologia", "Patologia", "Patrimoniales", "Pediatria Y Neonatologia", "Penfield",
+            "Percial", "Podologia Y Peluqueria", "Polo Educativo", "Pre Alta", "Quirofano",
+            "RRHH", "Recuperacion Clinica", "Registro Civil", "Rehabilitacion Fisica Y Kinesiologia",
+            "Rehabilitacion Salud Mental Direccion", "Reumatologia Y Oftalmologia",
+            "SAC", "SAM", "SAMO Contable", "SAMO Facturacion",
+            "SAP (Servicio De Area Programatica Y Redes De Salud)", "SGU", "Sala De Endoscopia",
+            "Sala F", "Sala G", "Seguridad E Higiene", "Servicio De Psicologia",
+            "Servicio Rehabilitacion Larga Distancia", "Servicio Social", "Sumar",
+            "Tocoginecologia", "Toxicologia", "Traumatologia", "U.T.I.", "UCAC",
+            "Vacunacion", "Vigilancia",
+        ]
+        ya_existe_fijo = any(nombre.lower() == s.lower() for s in SERVICIOS_FIJOS)
+        ya_existe_extra = ServicioExtra.objects.filter(nombre__iexact=nombre).exists()
+
+        if not nombre:
+            messages.error(request, "El nombre no puede estar vacío.")
+        elif ya_existe_fijo or ya_existe_extra:
+            messages.error(request, f"El servicio '{nombre}' ya existe.")
+        else:
+            ServicioExtra.objects.create(nombre=nombre)
+            messages.success(request, f"Servicio '{nombre}' agregado correctamente.")
+            return redirect("agregar_servicio")
+
+    servicios = ServicioExtra.objects.all()
+    ctx = perms
+    ctx.update({"servicios": servicios})
+    return render(request, "agregar_servicio.html", ctx)
+
+@login_required
 def reportes_view(request):
     scope = (request.GET.get("scope") or "24h").lower()
     now = timezone.now()
 
     if scope == "24h":
         since_dt = now - timedelta(hours=24)
+        since_date = since_dt.date()
+        bienes = (
+            BienPatrimonial.objects
+            .select_related("expediente")
+            .filter(
+                Q(fecha_adquisicion__gte=since_date) |
+                Q(fecha_baja__gte=since_date)
+            )
+            .order_by("-fecha_baja", "-fecha_adquisicion", "pk")
+        )
+    elif scope == "12h":
+        since_dt = now - timedelta(hours=12)
+        since_date = since_dt.date()
+        bienes = (
+            BienPatrimonial.objects
+            .select_related("expediente")
+            .filter(
+                Q(fecha_adquisicion__gte=since_date) |
+                Q(fecha_baja__gte=since_date)
+            )
+            .order_by("-fecha_baja", "-fecha_adquisicion", "pk")
+        )
+    elif scope == "6h":
+        since_dt = now - timedelta(hours=6)
         since_date = since_dt.date()
         bienes = (
             BienPatrimonial.objects
@@ -782,11 +999,51 @@ def reportes_view(request):
             .order_by("-fecha_adquisicion", "pk")
         )
 
-    try:
-        per_page = int(request.GET.get("per_page") or 30)
-    except ValueError:
-        per_page = 30
+    servicios_seleccionados = request.GET.getlist("servicio")
+    if servicios_seleccionados:
+        q_services = Q()
+        for s in servicios_seleccionados:
+            val = s.strip()
+            if "samo" in val.lower():
+                q_services |= Q(servicios__icontains="SAMO") | Q(servicios__icontains="Samo")
+            else:
+                import unicodedata
+                def clean_word(w):
+                    nfkd = unicodedata.normalize('NFKD', w)
+                    return "".join([c for c in nfkd if not unicodedata.combining(c)]).lower()
+                words = [clean_word(w) for w in val.split() if len(w) > 2 and w.lower() not in ["de", "la", "el", "los", "las", "del"]]
+                if words:
+                    q_words = Q()
+                    for w in words:
+                        q_words |= Q(servicios__icontains=w)
+                    q_services |= q_words
+                else:
+                    q_services |= Q(servicios__icontains=val)
+        bienes = bienes.filter(q_services)
 
+    q = (request.GET.get("q") or "").strip()
+    if q:
+        bienes = bienes.filter(
+            Q(clave_unica__icontains=q)
+            | Q(descripcion__icontains=q)
+            | Q(observaciones__icontains=q)
+            | Q(numero_identificacion__icontains=q)
+            | Q(servicios__icontains=q)
+            | Q(cuenta_codigo__icontains=q)
+            | Q(nomenclatura_bienes__icontains=q)
+            | Q(numero_serie__icontains=q)
+            | Q(origen__icontains=q)
+            | Q(estado__icontains=q)
+            | Q(expediente__numero_expediente__icontains=q)
+            | Q(expediente__numero_compra__icontains=q)
+        )
+
+    try:
+        per_page = int(request.GET.get("per_page") or 15)
+    except ValueError:
+        per_page = 15
+
+ 
     paginator = Paginator(bienes, per_page)
     page_raw = request.GET.get("page") or "1"
     try:
@@ -824,10 +1081,47 @@ def reportes_view(request):
     qd.pop("page", None)
     querystring = qd.urlencode()
 
+    from core.models.servicio_extra import ServicioExtra
+    SERVICIOS_FIJOS = [
+        "Apoyo A La Comunidad", "Area Guardia", "Area Limpieza Hospitalaria",
+        "Area Parque Cultural", "Arquitectura", "CAPER", "Camilleros", "Cardiologia",
+        "Charcot", "Cirugia", "Clinica", "Cocina", "Compras", "Conmutador", "Consejeria",
+        "Consultorio De Gastroenterologia", "Consultorio Externo Salud Mental",
+        "Consultorios Externos Pab V", "Contable", "Costurero",
+        "Cud Y Servicios De Consumos Problematicos", "Departamento De Enfermerias Supervision",
+        "Departamento Sistema De Informacion - Samo Turnos Y Estadistica",
+        "Deposito Descartable", "Deposito General", "Dermatologia", "Diagnostico Por Imagenes",
+        "Dira", "Direccion Administrativa", "Direccion Asociada Area Tecnica",
+        "Direccion Asociada Medico Quirurgica", "Direccion Ejecutiva", "Direccion Salud Mental",
+        "Dispositivo Artistico Cultural", "Docencia E Investigacion",
+        "Donacion Fundacion Florencio Perez", "Emergencia", "En Guarda Patrimoniales",
+        "Enfermeria", "Epidemiologia", "Estadistica", "Estadistica Central",
+        "Estadistica Pabellon V", "Esterilizacion", "Farmacia", "Gastroenterologia",
+        "Gerenciamiento De Camas", "Hemoterapia", "Infancias Y Juventudes", "Infectologia",
+        "Informatica", "Infraestructura Y Mantenimiento", "Intendencia", "Jardin Maternal",
+        "Laboratorio", "Lasegue", "Legales", "Limpieza", "Mesa De Entrada",
+        "Neumonologia Y Oftalmologia", "Neurocirugia", "Neuropsicologia", "Odontologia",
+        "Oncologia", "Patologia", "Patrimoniales", "Pediatria Y Neonatologia", "Penfield",
+        "Percial", "Podologia Y Peluqueria", "Polo Educativo", "Pre Alta", "Quirofano",
+        "RRHH", "Recuperacion Clinica", "Registro Civil", "Rehabilitacion Fisica Y Kinesiologia",
+        "Rehabilitacion Salud Mental Direccion", "Reumatologia Y Oftalmologia",
+        "SAC", "SAM", "SAMO Contable", "SAMO Facturacion",
+        "SAP (Servicio De Area Programatica Y Redes De Salud)", "SGU", "Sala De Endoscopia",
+        "Sala F", "Sala G", "Seguridad E Higiene", "Servicio De Psicologia",
+        "Servicio Rehabilitacion Larga Distancia", "Servicio Social", "Sumar",
+        "Tocoginecologia", "Toxicologia", "Traumatologia", "U.T.I.", "UCAC",
+        "Vacunacion", "Vigilancia",
+    ]
+    extras = list(ServicioExtra.objects.values_list('nombre', flat=True))
+    todos_servicios = sorted(set(SERVICIOS_FIJOS + extras))
+
     ctx = permisos_context(request.user)
     ctx.update({
         "bienes": page_obj.object_list,
         "scope": scope,
+        "q": q,
+        "servicios_seleccionados": servicios_seleccionados,
+        "todos_servicios": todos_servicios,
         "paginator": paginator,
         "page_obj": page_obj,
         "is_paginated": paginator.num_pages > 1,
@@ -836,6 +1130,7 @@ def reportes_view(request):
         "next_page": next_page,
         "querystring": querystring,
     })
+
     return render(request, "reportes.html", ctx)
 
 
@@ -995,7 +1290,21 @@ def _filtrar_bienes(request, base_qs):
         if h:
             base_qs = base_qs.filter(fecha_adquisicion__lte=h)
 
-    base_qs = base_qs.order_by(*_build_ordering(orden))
+    if orden == "servicios":
+        from django.db.models import Case, When, Value, IntegerField
+        from django.db.models.functions import Upper, Substr
+        base_qs = base_qs.annotate(
+            first_char=Upper(Substr('servicios', 1, 1))
+        ).annotate(
+            starts_with_letter=Case(
+                When(first_char__gte='A', first_char__lte='Z', then=Value(0)),
+                default=Value(1),
+                output_field=IntegerField()
+            )
+        )
+        base_qs = base_qs.order_by('starts_with_letter', 'servicios', 'pk')
+    else:
+        base_qs = base_qs.order_by(*_build_ordering(orden))
     return base_qs, q
 
 
@@ -1071,7 +1380,11 @@ def editar_bien(request, pk):
         form = BienPatrimonialForm(instance=bien)
 
     context = permisos_context(request.user)
-    context.update({"form": form, "bien": bien})
+    context.update({
+        "form": form,
+        "bien": bien,
+        "servicios_extra": ServicioExtra.objects.all(),
+    })
     return render(request, "bienes/editar_bien.html", context)
 
 
@@ -1107,43 +1420,39 @@ def carga_masiva_bienes(request):
     if not form.is_valid():
         context = permisos_context(request.user)
         context.update({"form": form})
-        return render(request, "carga_masiva.html", context)
+        return render(request, "carga_masiva.html", {"form": form})
 
     try:
-        from core.models import Expediente
-        import unicodedata
-        import os
-
         archivos = request.FILES.getlist("archivo_excel")
         sector_form = (form.cleaned_data.get("servicio") or "").strip()
+        hashes_esta_carga = set()
+        hashes_contenido_esta_carga = set()
+
+        creados, actualizados, sin_cambios, duplicados_omitidos, errores = 0, 0, 0, 0, []
+        from core.models import Expediente, BienPatrimonial, Notificacion, ArchivoCargaMasiva
+        import unicodedata
+        import os
+        from datetime import date
+        from decimal import Decimal, InvalidOperation
 
         def normalizar(texto: str) -> str:
-            texto = texto.replace('\u00b0', '').replace('\u00ba', '')
+            """Normaliza un nombre de columna: minúsculas, sin acentos, sin caracteres especiales."""
+            if not texto: return ""
+            texto = str(texto).replace('\u00b0', '').replace('\u00ba', '')  # °, º
             texto = unicodedata.normalize('NFKD', texto)
             texto = ''.join(c for c in texto if not unicodedata.combining(c))
             texto = ''.join(c if c.isalnum() or c == ' ' else ' ' for c in texto)
             return ' '.join(texto.lower().split())
 
         def s(v: object) -> str:
-            if v is None:
-                return ""
+            """Limpia el valor; devuelve '' si es vacío/nan."""
+            if v is None: return ""
             txt = str(v).strip()
             return "" if txt.lower() in ("nan", "none") else txt
 
-        def to_int1(v) -> int:
-            txt = s(v)
-            if not txt:
-                return 1
-            try:
-                val = int(float(txt))
-                return max(val, 1)
-            except (ValueError, TypeError):
-                return 1
-
         def parse_money(v):
             txt = s(v)
-            if not txt:
-                return None
+            if not txt: return None
             txt = txt.replace("$", "").replace(" ", "")
             if "," in txt and txt.rfind(",") > txt.rfind("."):
                 txt = txt.replace(".", "").replace(",", ".")
@@ -1156,203 +1465,307 @@ def carga_masiva_bienes(request):
 
         def parse_date_any(v):
             txt = s(v)
-            if not txt:
-                return None
+            if not txt: return None
             try:
                 dt = pd.to_datetime(txt, errors="coerce", dayfirst=True)
-                if pd.isna(dt):
-                    return None
+                if pd.isna(dt): return None
                 return dt.date()
             except (ValueError, TypeError):
                 return None
 
         def map_origen(v):
             t = s(v).lower()
-            if not t:
-                return None
-            if "compra" in t or "minister" in t:
-                return "COMPRA"
-            if "donac" in t:
-                return "DONACION"
-            if "omisi" in t:
-                return "OMISION"
-            if "transfer" in t or "traslad" in t:
-                return "TRANSFERENCIA"
+            if not t: return None
+            if "compra" in t or "minister" in t: return "COMPRA"
+            if "donac" in t: return "DONACION"
+            if "omisi" in t: return "OMISION"
+            if "transfer" in t or "traslad" in t: return "TRANSFERENCIA"
             return None
 
         def map_estado(v):
             t = s(v).lower()
-            if not t:
-                return None
-            if "manten" in t:
-                return "MANTENIMIENTO"
-            if "baja" in t:
-                return "BAJA"
-            if "inac" in t:
-                return "INACTIVO"
-            if "activ" in t:
-                return "ACTIVO"
+            if not t: return None
+            if "manten" in t: return "MANTENIMIENTO"
+            if "baja" in t: return "BAJA"
+            if "inac" in t: return "INACTIVO"
+            if "activ" in t: return "ACTIVO"
             return None
 
-        creados, actualizados, errores = 0, 0, []
+        def hash_archivo_subido(archivo) -> str:
+            hasher = hashlib.sha256()
+            for chunk in archivo.chunks():
+                hasher.update(chunk)
+            archivo.seek(0)
+            return hasher.hexdigest()
+
+        def hash_contenido_dataframe(df: pd.DataFrame) -> str:
+            df_normalizado = df.copy()
+            df_normalizado.columns = [normalizar(str(c)) for c in df_normalizado.columns]
+
+            for columna in df_normalizado.columns:
+                df_normalizado[columna] = df_normalizado[columna].map(s)
+
+            # Quita filas completamente vacías para no depender de relleno accidental del Excel.
+            df_normalizado = df_normalizado.loc[
+                ~(df_normalizado.apply(lambda fila: all(not valor for valor in fila), axis=1))
+            ].reset_index(drop=True)
+
+            columnas_ordenadas = sorted(df_normalizado.columns)
+            registros = []
+            for _, row in df_normalizado[columnas_ordenadas].iterrows():
+                registros.append("||".join(row[col] for col in columnas_ordenadas))
+
+            contenido_canonico = "\n".join(
+                [f"cols:{'||'.join(columnas_ordenadas)}", *registros]
+            )
+            return hashlib.sha256(contenido_canonico.encode("utf-8")).hexdigest()
+
+        def clave_fila_canonica(numero_id_val, nro_serie, descripcion, cuenta_cod, nomencl, servicios):
+            if numero_id_val:
+                return f"id:{normalizar(numero_id_val)}"
+            if nro_serie != "NO" and descripcion:
+                return f"serie_desc:{normalizar(nro_serie)}|{normalizar(descripcion)}"
+            partes = [
+                normalizar(descripcion or ""),
+                normalizar(nro_serie if nro_serie != "NO" else ""),
+                normalizar(cuenta_cod if cuenta_cod != "NO" else ""),
+                normalizar(nomencl if nomencl != "NO" else ""),
+                normalizar(servicios if servicios != "NO" else ""),
+            ]
+            return f"fila:{'|'.join(partes)}"
+
+        def valores_distintos(valor_actual, valor_nuevo):
+            if hasattr(valor_actual, "pk") or hasattr(valor_nuevo, "pk"):
+                actual_pk = getattr(valor_actual, "pk", None) if valor_actual else None
+                nuevo_pk = getattr(valor_nuevo, "pk", None) if valor_nuevo else None
+                return actual_pk != nuevo_pk
+            return valor_actual != valor_nuevo
+
+        claves_filas_esta_carga = set()
 
         for archivo in archivos:
-            nombre_archivo = getattr(archivo, 'name', '').lower()
-            if nombre_archivo.endswith('.xls'):
-                engine = 'xlrd'
-            elif nombre_archivo.endswith('.xlsb'):
-                engine = 'pyxlsb'
-            elif nombre_archivo.endswith(('.ods', '.odf', '.odt')):
-                engine = 'odf'
-            else:
-                engine = 'openpyxl'
+            nombre_archivo_completo = getattr(archivo, 'name', 'Archivo')
+            try:
+                hash_archivo = hash_archivo_subido(archivo)
 
-            df = pd.read_excel(archivo, dtype=str, engine=engine)
-            df.columns = [normalizar(str(c)) for c in df.columns]
+                nombre_archivo_lower = nombre_archivo_completo.lower()
+                
+                # Nombre del servicio basado en el archivo
+                servicio_archivo = os.path.splitext(nombre_archivo_completo)[0].upper()
+                if sector_form:
+                    servicio_archivo = f"{sector_form} - {servicio_archivo}"
 
-            servicio_archivo = sector_form
-            if not servicio_archivo:
-                servicio_archivo = os.path.splitext(getattr(archivo, 'name', ''))[0].upper()
+                if nombre_archivo_lower.endswith('.xls') or nombre_archivo_lower.endswith('.xlt'):
+                    engine = 'xlrd'
+                elif nombre_archivo_lower.endswith('.xlsb'):
+                    engine = 'pyxlsb'
+                elif nombre_archivo_lower.endswith(('.ods', '.odf', '.odt')):
+                    engine = 'odf'
+                else:
+                    engine = 'openpyxl'
 
-            def get_first(row, names) -> str:
-                for n in names:
-                    key = normalizar(n)
-                    if key in df.columns:
-                        return s(row.get(key))
-                return ""
-
-            def get_first_no(row, names) -> str:
-                val = get_first(row, names)
-                return val if val else "NO"
-
-            for i, row in df.iterrows():
                 try:
-                    with transaction.atomic():
-                        numero_id = get_first(row, [
-                            "n° id", "nº id", "n° de id", "nº de id",
-                            "n de id", "n_de_id", "numero_identificacion",
-                            "id_patrimonial", "no de id", "n id",
-                        ])
-                        nro_exp = get_first(row, [
-                            "n° expediente", "nº expediente", "n° de expediente",
-                            "n de expediente", "n_de_expediente", "numero_expediente",
-                            "nº de expediente", "no de expediente", "expediente",
-                        ])
-                        nro_compra = get_first(row, [
-                            "n° compra", "nº compra", "n° de compra",
-                            "n de compra", "n_de_compra", "numero_compra",
-                            "nº de compra", "no de compra",
-                        ])
-                        nro_serie = get_first_no(row, [
-                            "n° serie", "nº serie", "n° de serie",
-                            "n de serie", "n_de_serie", "numero_serie",
-                            "nº de serie", "no de serie",
-                        ])
-                        descripcion = get_first(row, [
-                            "descripcion", "descripción", "descripcion_del_bien",
-                        ])
-                        cuenta_cod = get_first_no(row, [
-                            "cuenta código", "cuenta codigo", "cuenta_código", "cuenta_codigo",
-                        ])
-                        nomencl = get_first_no(row, [
-                            "nomenclatura", "nomenclatura de bienes",
-                            "nomenclatura_de_bienes", "nomenclatura_bienes",
-                        ])
-                        observ = get_first_no(row, ["observaciones", "obs"])
-                        origen_txt = get_first(row, ["origen"])
-                        estado_txt = get_first(row, ["estado"])
-                        precio_raw = get_first(row, ["precio", "valor", "importe"])
-                        cantidad = to_int1(get_first(row, ["cantidad"]))
-                        servicios_raw = s(get_first(row, ["servicios", "servicio", "sector"]) or servicio_archivo)
-                        servicios = servicios_raw if servicios_raw else "NO"
-                        fecha_alta = parse_date_any(get_first(row, [
-                            "fecha alta", "fecha de alta", "fecha_de_alta", "fecha_alta",
-                        ]))
-                        fecha_baja = parse_date_any(get_first(row, [
-                            "fecha de baja", "fecha_de_baja", "fecha_baja",
-                        ]))
-                        origen_val = map_origen(origen_txt)
-                        estado_val = map_estado(estado_txt)
-                        precio = parse_money(precio_raw)
-                        if origen_val != "COMPRA":
-                            precio = None
-                        if not fecha_alta:
-                            fecha_alta = date.today()
+                    df = pd.read_excel(archivo, dtype=str, engine=engine)
+                except Exception:
+                    df = pd.read_excel(archivo, dtype=str)
 
-                        expediente_obj = None
-                        if nro_exp and nro_exp.upper() != "NO":
-                            expediente_obj, _ = Expediente.objects.get_or_create(
-                                numero_expediente=nro_exp
+                # Detección de cabeceras
+                df.columns = [normalizar(str(c)) for c in df.columns]
+                keywords = ["descripcion", "cantidad", "expediente", "compra", "clave", "id", "serie", "nomenclatura"]
+                cols_combined = " ".join(df.columns)
+                
+                if sum(1 for k in keywords if k in cols_combined) < 2:
+                    header_found = False
+                    for idx, row in df.head(25).iterrows():
+                        row_values = [normalizar(str(v)) for v in row.values if v and str(v).lower() != 'nan']
+                        row_combined = " ".join(row_values)
+                        if sum(1 for k in keywords if k in row_combined) >= 2:
+                            new_cols = []
+                            for i, val in enumerate(row.values):
+                                val_str = normalizar(str(val)) if val and str(val).lower() != 'nan' else f"columna_{i}"
+                                new_cols.append(val_str)
+                            df.columns = new_cols
+                            df = df.iloc[idx+1:].reset_index(drop=True)
+                            header_found = True
+                            break
+                    if not header_found:
+                        errores.append(f"No se detectaron cabeceras válidas en '{nombre_archivo_completo}'")
+                        continue
+
+                hash_contenido = hash_contenido_dataframe(df)
+                if (
+                    hash_archivo in hashes_esta_carga
+                    or hash_contenido in hashes_contenido_esta_carga
+                    or ArchivoCargaMasiva.objects.filter(hash_archivo=hash_archivo).exists()
+                    or ArchivoCargaMasiva.objects.filter(hash_contenido=hash_contenido).exists()
+                ):
+                    errores.append(f"Excel ya cargado: '{nombre_archivo_completo}'")
+                    continue
+
+                # Helpers de búsqueda de columnas (definidos por archivo porque dependen de df.columns)
+                def get_first(row_data, names):
+                    # 1. Match exacto
+                    for n in names:
+                        key = normalizar(n)
+                        if key in df.columns:
+                            return s(row_data.get(key))
+                    # 2. Match difuso
+                    for n in names:
+                        key = normalizar(n)
+                        if len(key) < 3: continue
+                        for col in df.columns:
+                            if key in col:
+                                return s(row_data.get(col))
+                    return ""
+
+                def get_first_no(row_data, names):
+                    val = get_first(row_data, names)
+                    return val if val else "NO"
+
+                def to_int1(v):
+                    txt = s(v)
+                    if not txt: return 1
+                    try:
+                        return max(int(float(txt)), 1)
+                    except (ValueError, TypeError):
+                        return 1
+
+                # Procesamiento de filas
+                errores_previos = len(errores)
+                for i, row in df.iterrows():
+                    try:
+                        with transaction.atomic():
+                            numero_id = get_first(row, ["n id", "numero identificacion", "id patrimonial", "id", "identificacion"])
+                            nro_exp = get_first(row, ["n expediente", "numero expediente", "expediente", "exp", "nro exp"])
+                            nro_compra = get_first(row, ["n compra", "numero compra", "compra", "nro compra", "orden de compra", "oc"])
+                            nro_serie = get_first_no(row, ["n serie", "numero serie", "serie", "nro serie"])
+                            descripcion = get_first(row, ["descripcion", "descripción", "detalle", "nombre", "bien"])
+                            cuenta_cod = get_first_no(row, ["cuenta codigo", "cuenta", "cod cuenta"])
+                            nomencl = get_first_no(row, ["nomenclatura", "nomenclatura bienes", "cod nomenclatura"])
+                            observ = get_first_no(row, ["observaciones", "obs", "comentarios"])
+                            origen_txt = get_first(row, ["origen"])
+                            estado_txt = get_first(row, ["estado"])
+                            precio_raw = get_first(row, ["precio", "valor", "importe", "costo", "valor adquisicion"])
+                            cantidad = to_int1(get_first(row, ["cantidad"]))
+                            
+                            serv_raw = s(get_first(row, ["servicios", "servicio", "sector"]) or servicio_archivo)
+                            servicios = (serv_raw if serv_raw else "NO")[:200]
+
+                            fecha_alta = parse_date_any(get_first(row, ["fecha alta", "fecha de alta"])) or date.today()
+                            fecha_baja = parse_date_any(get_first(row, ["fecha de baja"]))
+                            
+                            origen_val = map_origen(origen_txt)
+                            estado_val = map_estado(estado_txt)
+                            precio = parse_money(precio_raw) if origen_val == "COMPRA" else None
+
+                            expediente_obj = None
+                            if nro_exp and nro_exp.upper() != "NO":
+                                expediente_obj, _ = Expediente.objects.get_or_create(numero_expediente=nro_exp[:50])
+                                if nro_compra and nro_compra.upper() != "NO":
+                                    expediente_obj.numero_compra = nro_compra[:50]
+                                    expediente_obj.save(update_fields=["numero_compra"])
+
+                            nombre_bien = (descripcion[:200] if descripcion else (nro_serie[:200] if nro_serie != "NO" else "NO"))
+                            numero_id_val = ((numero_id or "").strip() or None)
+                            if numero_id_val:
+                                numero_id_val = numero_id_val[:50]
+
+                            defaults = {
+                                "nombre": nombre_bien,
+                                "descripcion": descripcion or "NO",
+                                "cantidad": cantidad,
+                                "servicios": servicios,
+                                "numero_serie": nro_serie[:100],
+                                "numero_identificacion": numero_id_val,
+                                "cuenta_codigo": cuenta_cod[:20],
+                                "nomenclatura_bienes": nomencl[:200],
+                                "observaciones": observ,
+                                "valor_adquisicion": precio,
+                                "fecha_adquisicion": fecha_alta,
+                                "fecha_baja": fecha_baja,
+                                "expediente": expediente_obj,
+                                "numero_compra": (nro_compra if nro_compra and nro_compra.upper() != "NO" else "NO")[:50],
+                            }
+                            if origen_val: defaults["origen"] = origen_val
+                            if estado_val: defaults["estado"] = estado_val
+
+                            clave_fila = clave_fila_canonica(
+                                numero_id_val,
+                                nro_serie,
+                                descripcion,
+                                cuenta_cod,
+                                nomencl,
+                                servicios,
                             )
-                            if nro_compra and nro_compra.upper() != "NO":
-                                expediente_obj.numero_compra = nro_compra
-                                expediente_obj.save(update_fields=["numero_compra"])
+                            if clave_fila in claves_filas_esta_carga:
+                                duplicados_omitidos += 1
+                                continue
 
-                        nombre = descripcion[:200] if descripcion else (nro_serie if nro_serie != "NO" else "SIN NOMBRE")
+                            bien_existente = None
+                            if numero_id_val:
+                                bien_existente = BienPatrimonial.objects.filter(
+                                    numero_identificacion=numero_id_val
+                                ).first()
+                            elif nro_serie != "NO" and descripcion:
+                                bien_existente = BienPatrimonial.objects.filter(
+                                    numero_serie=nro_serie,
+                                    descripcion=descripcion,
+                                ).first()
 
-                        defaults = {
-                            "nombre": nombre,
-                            "descripcion": descripcion or "",
-                            "cantidad": cantidad,
-                            "servicios": servicios,
-                            "numero_serie": nro_serie,
-                            "cuenta_codigo": cuenta_cod,
-                            "nomenclatura_bienes": nomencl,
-                            "observaciones": observ,
-                            "valor_adquisicion": precio,
-                            "fecha_adquisicion": fecha_alta,
-                            "fecha_baja": fecha_baja,
-                            "expediente": expediente_obj,
-                        }
-                        if origen_val is not None:
-                            defaults["origen"] = origen_val
-                        if estado_val is not None:
-                            defaults["estado"] = estado_val
+                            if bien_existente is None:
+                                BienPatrimonial.objects.create(**defaults)
+                                creados += 1
+                            else:
+                                campos_a_actualizar = []
+                                for campo, valor_nuevo in defaults.items():
+                                    if valores_distintos(getattr(bien_existente, campo), valor_nuevo):
+                                        setattr(bien_existente, campo, valor_nuevo)
+                                        campos_a_actualizar.append(campo)
 
-                        numero_id_val = (numero_id or "").strip() or None
-                        if numero_id_val is not None:
-                            _, created = BienPatrimonial.objects.update_or_create(
-                                numero_identificacion=numero_id_val,
-                                defaults=defaults,
-                            )
-                        elif nro_serie and nro_serie != "NO" and descripcion:
-                            _, created = BienPatrimonial.objects.update_or_create(
-                                numero_serie=nro_serie,
-                                descripcion=descripcion or "",
-                                defaults=defaults,
-                            )
-                        else:
-                            BienPatrimonial.objects.create(**defaults)
-                            created = True
+                                if campos_a_actualizar:
+                                    bien_existente.save(update_fields=campos_a_actualizar)
+                                    actualizados += 1
+                                else:
+                                    sin_cambios += 1
 
-                        if created:
-                            creados += 1
-                        else:
-                            actualizados += 1
-
-                except Exception as e:
-                    errores.append(f"Fila {i + 1} en '{getattr(archivo, 'name', 'Excel')}': {str(e)}")
+                            claves_filas_esta_carga.add(clave_fila)
+                    except Exception as e:
+                        errores.append(f"Error en {nombre_archivo_completo} (fila {i+1}): {str(e)}")
+                if len(errores) == errores_previos:
+                    ArchivoCargaMasiva.objects.create(
+                        nombre_archivo=nombre_archivo_completo,
+                        hash_archivo=hash_archivo,
+                        hash_contenido=hash_contenido,
+                        usuario=request.user,
+                    )
+                    hashes_esta_carga.add(hash_archivo)
+                    hashes_contenido_esta_carga.add(hash_contenido)
+            except Exception as e:
+                errores.append(f"Error crítico procesando '{nombre_archivo_completo}': {str(e)}")
 
         if creados or actualizados:
             messages.success(
                 request,
-                f"✅ Creados: {creados}, Actualizados: {actualizados}. Errores: {len(errores)}",
+                f"✅ Creados: {creados}, Actualizados: {actualizados}, Sin cambios: {sin_cambios}, Duplicados omitidos: {duplicados_omitidos}. Archivos: {len(archivos)}. Errores: {len(errores)}"
             )
         else:
-            messages.warning(request, "No se crearon ni actualizaron bienes.")
-
+            messages.warning(
+                request,
+                f"No se procesaron registros nuevos. Sin cambios: {sin_cambios}. Duplicados omitidos: {duplicados_omitidos}."
+            )
+        
         if errores:
-            messages.error(request, "Algunas filas fallaron: " + " | ".join(errores[:8]))
+            messages.error(request, "Resumen de errores: " + " | ".join(errores[:5]))
 
         Notificacion.objects.create(
             usuario=request.user,
-            mensaje=f"Se realizó una carga masiva: {creados} bienes registrados. Errores: {len(errores)}.",
-            leida=False,
+            mensaje=f"Carga masiva finalizada: {creados} nuevos, {actualizados} actualizados, {sin_cambios} sin cambios, {duplicados_omitidos} duplicados omitidos. {len(errores)} errores.",
+            leida=False
         )
         return redirect("lista_bienes")
 
-    except (FileNotFoundError, pd.errors.EmptyDataError, KeyError) as e:
-        messages.error(request, f"Error al procesar el archivo: {e}")
+    except Exception as e:
+        messages.error(request, f"Error general en la carga: {str(e)}")
         return redirect("lista_bienes")
 
 
@@ -1487,6 +1900,51 @@ def dar_baja_bien(request, pk):
 @login_required
 @require_POST
 @transaction.atomic
+def dar_baja_bienes_seleccionados(request):
+    perms = permisos_context(request.user)
+    if not perms["es_admin"]:
+        messages.error(request, "No tienes permisos para dar de baja bienes.")
+        return redirect("lista_bienes")
+
+    pks = request.POST.getlist("bienes_seleccionados_baja")
+    if not pks:
+        messages.warning(request, "No se seleccionó ningún bien para dar de baja.")
+        return redirect("lista_bienes")
+
+    bienes = BienPatrimonial.objects.filter(pk__in=pks)
+    count = bienes.count()
+    if count == 0:
+        messages.warning(request, "No se encontraron los bienes seleccionados.")
+        return redirect("lista_bienes")
+
+    nombres_bienes = []
+    
+    for bien in bienes:
+        pk = str(bien.pk)
+        fecha_str = request.POST.get(f"fecha_baja_{pk}")
+        fecha_baja = parse_date(fecha_str or "") or date.today()
+        expediente_baja = (request.POST.get(f"expediente_baja_{pk}") or "").strip()
+        descripcion_baja = (request.POST.get(f"descripcion_baja_{pk}") or "").strip()
+
+        bien.estado = "BAJA"
+        bien.fecha_baja = fecha_baja
+        bien.expediente_baja = expediente_baja
+        bien.descripcion_baja = descripcion_baja
+        bien.save(update_fields=["estado", "fecha_baja", "expediente_baja", "descripcion_baja"])
+        
+        nombre = getattr(bien, "nombre", None) or getattr(bien, "descripcion", "Sin nombre")
+        nombres_bienes.append(nombre)
+
+    crear_notificacion_admins(
+        f"Se dieron de baja {count} bienes: {', '.join(nombres_bienes[:5])}{'...' if count > 5 else ''}."
+    )
+    messages.success(request, f"Se han dado de baja {count} bienes correctamente.")
+    return redirect("lista_bienes")
+ 
+ 
+@login_required
+@require_POST
+@transaction.atomic
 def restablecer_bien(request, pk):
     perms = permisos_context(request.user)
     if not perms["es_admin"]:
@@ -1518,6 +1976,55 @@ def restablecer_bien(request, pk):
 @login_required
 @require_POST
 @transaction.atomic
+def restablecer_bienes_seleccionados(request):
+    perms = permisos_context(request.user)
+    if not perms["es_admin"]:
+        messages.error(request, "No tienes permisos para restablecer bienes.")
+        return redirect("lista_baja_bienes")
+
+    pks = request.POST.getlist("bienes_seleccionados_restaurar")
+    if not pks:
+        messages.warning(request, "No se seleccionó ningún bien.")
+        return redirect("lista_baja_bienes")
+
+    bienes = BienPatrimonial.objects.filter(pk__in=pks)
+    count = bienes.count()
+    if count == 0:
+        return redirect("lista_baja_bienes")
+
+    nombres = []
+    for bien in bienes:
+        bien.estado = "ACTIVO"
+        if hasattr(bien, "fecha_baja"):
+            bien.fecha_baja = None
+        if hasattr(bien, "expediente_baja"):
+            bien.expediente_baja = None
+        if hasattr(bien, "descripcion_baja"):
+            bien.descripcion_baja = ""
+            
+        nombres.append(getattr(bien, "nombre", None) or getattr(bien, "descripcion", "Sin nombre"))
+
+        update_fields = ["estado"]
+        if hasattr(bien, "fecha_baja"): update_fields.append("fecha_baja")
+        if hasattr(bien, "expediente_baja"): update_fields.append("expediente_baja")
+        if hasattr(bien, "descripcion_baja"): update_fields.append("descripcion_baja")
+
+        bien.save(update_fields=update_fields)
+
+    nombres_str = ", ".join(nombres[:5])
+    if count > 5:
+        nombres_str += f" y {count - 5} más"
+
+    crear_notificacion_admins(
+        f"Se restablecieron {count} bienes a ACTIVO: {nombres_str}."
+    )
+    messages.success(request, f"Se han restablecido {count} bienes correctamente.")
+    return redirect("lista_bienes")
+ 
+ 
+@login_required
+@require_POST
+@transaction.atomic
 def eliminar_bien_definitivo(request, pk):
     perms = permisos_context(request.user)
     if not perms["es_admin"]:
@@ -1533,8 +2040,6 @@ def eliminar_bien_definitivo(request, pk):
     )
     messages.success(request, f"Bien '{nombre_bien}' eliminado definitivamente.")
     return redirect("lista_baja_bienes")
-
-
  
  
 
@@ -1550,6 +2055,18 @@ def marcar_notificaciones_leidas(request):
             leida=False,
             eliminada=False
         ).update(leida=True)
+        return JsonResponse({"ok": True})
+    return JsonResponse({"ok": False}, status=400)
+
+
+@login_required
+@require_POST
+def borrar_todas_notificaciones(request):
+    if request.method == "POST":
+        Notificacion.objects.filter(
+            usuario=request.user,
+            eliminada=False
+        ).update(eliminada=True)
         return JsonResponse({"ok": True})
     return JsonResponse({"ok": False}, status=400)
 
@@ -1587,3 +2104,116 @@ def crear_notificacion_admins(mensaje):
     ).distinct()
     for admin in admins:
         crear_notificacion(admin, mensaje)
+
+@login_required
+def agregar_servicio_ajax(request):
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "Método no permitido."}, status=405)
+
+    perms = permisos_context(request.user)
+    if not perms["es_admin"]:
+        return JsonResponse({"ok": False, "error": "Sin permisos."}, status=403)
+
+    import json
+    try:
+        data = json.loads(request.body)
+        nombre = (data.get("nombre") or "").strip().title()
+    except Exception:
+        return JsonResponse({"ok": False, "error": "Datos inválidos."}, status=400)
+
+    if not nombre:
+        return JsonResponse({"ok": False, "error": "El nombre no puede estar vacío."})
+
+    SERVICIOS_FIJOS = [
+        "Apoyo A La Comunidad", "Area Guardia", "Area Limpieza Hospitalaria",
+        "Area Parque Cultural", "Arquitectura", "CAPER", "Camilleros", "Cardiologia",
+        "Charcot", "Cirugia", "Clinica", "Cocina", "Compras", "Conmutador", "Consejeria",
+        "Consultorio De Gastroenterologia", "Consultorio Externo Salud Mental",
+        "Consultorios Externos Pab V", "Contable", "Costurero",
+        "Cud Y Servicios De Consumos Problematicos", "Departamento De Enfermerias Supervision",
+        "Departamento Sistema De Informacion - Samo Turnos Y Estadistica",
+        "Deposito Descartable", "Deposito General", "Dermatologia", "Diagnostico Por Imagenes",
+        "Dira", "Direccion Administrativa", "Direccion Asociada Area Tecnica",
+        "Direccion Asociada Medico Quirurgica", "Direccion Ejecutiva", "Direccion Salud Mental",
+        "Dispositivo Artistico Cultural", "Docencia E Investigacion",
+        "Donacion Fundacion Florencio Perez", "Emergencia", "En Guarda Patrimoniales",
+        "Enfermeria", "Epidemiologia", "Estadistica", "Estadistica Central",
+        "Estadistica Pabellon V", "Esterilizacion", "Farmacia", "Gastroenterologia",
+        "Gerenciamiento De Camas", "Hemoterapia", "Infancias Y Juventudes", "Infectologia",
+        "Informatica", "Infraestructura Y Mantenimiento", "Intendencia", "Jardin Maternal",
+        "Laboratorio", "Lasegue", "Legales", "Limpieza", "Mesa De Entrada",
+        "Neumonologia Y Oftalmologia", "Neurocirugia", "Neuropsicologia", "Odontologia",
+        "Oncologia", "Patologia", "Patrimoniales", "Pediatria Y Neonatologia", "Penfield",
+        "Percial", "Podologia Y Peluqueria", "Polo Educativo", "Pre Alta", "Quirofano",
+        "RRHH", "Recuperacion Clinica", "Registro Civil", "Rehabilitacion Fisica Y Kinesiologia",
+        "Rehabilitacion Salud Mental Direccion", "Reumatologia Y Oftalmologia",
+        "SAC", "SAM", "SAMO Contable", "SAMO Facturacion",
+        "SAP (Servicio De Area Programatica Y Redes De Salud)", "SGU", "Sala De Endoscopia",
+        "Sala F", "Sala G", "Seguridad E Higiene", "Servicio De Psicologia",
+        "Servicio Rehabilitacion Larga Distancia", "Servicio Social", "Sumar",
+        "Tocoginecologia", "Toxicologia", "Traumatologia", "U.T.I.", "UCAC",
+        "Vacunacion", "Vigilancia",
+    ]
+
+    ya_existe_fijo = any(nombre.lower() == s.lower() for s in SERVICIOS_FIJOS)
+    ya_existe_extra = ServicioExtra.objects.filter(nombre__iexact=nombre).exists()
+
+    if ya_existe_fijo or ya_existe_extra:
+        return JsonResponse({"ok": False, "error": f"El servicio '{nombre}' ya existe."})
+
+    ServicioExtra.objects.create(nombre=nombre)
+    return JsonResponse({"ok": True, "nombre": nombre, "mensaje": f"Servicio '{nombre}' agregado correctamente."})
+ 
+@login_required
+def agregar_servicio(request):
+    perms = permisos_context(request.user)
+    if not perms["es_admin"]:
+        messages.error(request, "No tienes permisos para agregar servicios.")
+        return redirect("home_operador")
+
+    if request.method == "POST":
+        nombre = (request.POST.get("nombre") or "").strip().title()
+        SERVICIOS_FIJOS = [
+            "Apoyo A La Comunidad", "Area Guardia", "Area Limpieza Hospitalaria",
+            "Area Parque Cultural", "Arquitectura", "CAPER", "Camilleros", "Cardiologia",
+            "Charcot", "Cirugia", "Clinica", "Cocina", "Compras", "Conmutador", "Consejeria",
+            "Consultorio De Gastroenterologia", "Consultorio Externo Salud Mental",
+            "Consultorios Externos Pab V", "Contable", "Costurero",
+            "Cud Y Servicios De Consumos Problemacion", "Departamento De Enfermerias Supervision",
+            "Departamento Sistema De Informacion - Samo Turnos Y Estadistica",
+            "Deposito Descartable", "Deposito General", "Dermatologia", "Diagnostico Por Imagenes",
+            "Dira", "Direccion Administrativa", "Direccion Asociada Area Tecnica",
+            "Direccion Asociada Medico Quirurgica", "Direccion Ejecutiva", "Direccion Salud Mental",
+            "Dispositivo Artistico Cultural", "Docencia E Investigacion",
+            "Donacion Fundacion Florencio Perez", "Emergencia", "En Guarda Patrimoniales",
+            "Enfermeria", "Epidemiologia", "Estadistica", "Estadistica Central",
+            "Estadistica Pabellon V", "Esterilizacion", "Farmacia", "Gastroenterologia",
+            "Gerenciamiento De Camas", "Hemoterapia", "Infancias Y Juventudes", "Infectologia",
+            "Informatica", "Infraestructura Y Mantenimiento", "Intendencia", "Jardin Maternal",
+            "Laboratorio", "Lasegue", "Legales", "Limpieza", "Mesa De Entrada",
+            "Neumonologia Y Oftalmologia", "Neurocirugia", "Neuropsicologia", "Odontologia",
+            "Oncologia", "Patologia", "Patrimoniales", "Pediatria Y Neonatologia", "Penfield",
+            "Percial", "Podologia Y Peluqueria", "Polo Educativo", "Pre Alta", "Quirofano",
+            "RRHH", "Recuperacion Clinica", "Registro Civil", "Rehabilitacion Fisica Y Kinesiologia",
+            "Rehabilitacion Salud Mental Direccion", "Reumatologia Y Oftalmologia",
+            "SAC", "SAM", "SAMO Contable", "SAMO Facturacion",
+            "SAP (Servicio De Area Programatica Y Redes De Salud)", "SGU", "Sala De Endoscopia",
+            "Sala F", "Sala G", "Seguridad E Higiene", "Servicio De Psicologia",
+            "Servicio Rehabilitacion Larga Distancia", "Servicio Social", "Sumar",
+            "Tocoginecologia", "Toxicologia", "Traumatologia", "U.T.I.", "UCAC",
+            "Vacunacion", "Vigilancia",
+        ]
+        ya_existe_fijo = any(nombre.lower() == s.lower() for s in SERVICIOS_FIJOS)
+        ya_existe_extra = ServicioExtra.objects.filter(nombre__iexact=nombre).exists()
+
+        if ya_existe_fijo or ya_existe_extra:
+            messages.error(request, f"El servicio '{nombre}' ya existe.")
+        elif nombre:
+            ServicioExtra.objects.create(nombre=nombre)
+            messages.success(request, f"Servicio '{nombre}' agregado correctamente.")
+        else:
+            messages.error(request, "El nombre del servicio no puede estar vacío.")
+        
+        return redirect("alta_bien")
+
+    return render(request, "agregar_servicio.html")
