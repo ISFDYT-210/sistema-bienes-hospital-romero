@@ -52,24 +52,6 @@
     </tbody>
   </table>
 
-  {% if notifs %}
-  <h3 style="margin-top: 16px;">Acciones registradas</h3>
-  <table>
-    <thead>
-      <tr>
-        <th>Fecha</th>
-        <th>Mensaje</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for n in notifs %}
-      <tr>
-        <td class="text-nowrap">{{ n.fecha|date:"d/m/Y H:i" }}</td>
-        <td>{{ n.mensaje }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
+  
 </body>
 </html>

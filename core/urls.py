@@ -1,12 +1,7 @@
 from django.urls import path
 from django.views.generic import RedirectView
 from . import views
-
 from core.views import marcar_notificaciones_leidas, borrar_todas_notificaciones
-
-
-from core.views import marcar_notificaciones_leidas
-from core.views import home_supervisor, lista_bienes_supervisor
 
 urlpatterns = [
     # ===== Raíz del sitio =====
@@ -25,11 +20,7 @@ urlpatterns = [
     # ===== Dashboards =====
     path('home_admin/', views.home_admin, name='home_admin'),
     path('home_operador/', views.home_operador, name='home_operador'),
-
-    path("supervisor/", home_supervisor, name="home_supervisor"),
-    path("supervisor/bienes/", lista_bienes_supervisor, name="lista_bienes_supervisor"),
     path('home_supervisor/', views.home_supervisor, name='home_supervisor'),
-
 
     # ===== Operadores =====
     path('operadores/', views.operadores, name='operadores'),
@@ -46,12 +37,9 @@ urlpatterns = [
     path('servicios/agregar-ajax/', views.agregar_servicio_ajax, name='agregar_servicio_ajax'),
 
     # ===== Bienes =====
-    # Acciones específicas primero
     path('bienes/<int:pk>/editar/', views.editar_bien, name='editar_bien'),
     path('bienes/<int:pk>/eliminar/', views.eliminar_bien, name='eliminar_bien'),
     path('bienes/eliminar-seleccionados/', views.eliminar_bienes_seleccionados, name='eliminar_bienes_seleccionados'),
-    path('bienes/bajas-seleccionados/', views.dar_baja_bienes_seleccionados, name='dar_baja_bienes_seleccionados'),
-    path('bienes/restablecer-seleccionados/', views.restablecer_bienes_seleccionados, name='restablecer_bienes_seleccionados'),
 
     # Listas
     path('lista-bienes/', views.lista_bienes, name='lista_bienes'),
@@ -75,5 +63,4 @@ urlpatterns = [
     path('notificaciones/borrar-todas/', borrar_todas_notificaciones, name='borrar_todas_notificaciones'),
     path('notificaciones/<int:pk>/eliminar/', views.eliminar_notificacion, name='eliminar_notificacion'),
     path('notificaciones/<int:pk>/marcar-leida/', views.marcar_notificacion_leida, name='marcar_notificacion_leida'),
-    path('actualizar-tema/', views.actualizar_tema, name='actualizar_tema'),
 ]
