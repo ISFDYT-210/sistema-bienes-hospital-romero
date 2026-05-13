@@ -224,11 +224,8 @@ class BienPatrimonialForm(forms.ModelForm):
         if n_cmp and not n_exp:
             self.add_error("numero_expediente", "Si informás N° de compra, debés indicar el N° de Expediente.")
 
-<<<<<<< HEAD
 
         # Precio: si el origen no es COMPRA, ignorar precio
-=======
->>>>>>> e1d0f53f4f503511855dab9b41358df920d1f588
         if cleaned.get("origen") and cleaned["origen"] != "COMPRA":
             cleaned["valor_adquisicion"] = None
 
@@ -302,16 +299,10 @@ class OperadorForm(forms.Form):
         dni = (self.cleaned_data.get('dni') or '').strip()
         if not dni:
             return dni
-<<<<<<< HEAD
 
         if not dni.isdigit() or not (1 <= len(dni) <= 8):
             raise ValidationError('El DNI debe tener hasta 8 números.')
 
-
-=======
-        if not dni.isdigit() or len(dni) > 8:
-            raise ValidationError('El DNI debe tener sólo números y hasta 8 dígitos.')
->>>>>>> e1d0f53f4f503511855dab9b41358df920d1f588
         Operador = get_user_model()
         operadores = Operador.objects.filter(numero_doc__iexact=dni)
         if self.operador_pk:
@@ -330,7 +321,6 @@ class OperadorForm(forms.Form):
             operadores = operadores.exclude(pk=self.operador_pk)
         if operadores.exists():
             raise ValidationError('Ya existe un operador con ese email')
-<<<<<<< HEAD
         return email
 
     def clean_password(self):
@@ -356,6 +346,3 @@ class OperadorForm(forms.Form):
             raise ValidationError(e.messages)
 
         return password
-=======
-        return email
->>>>>>> e1d0f53f4f503511855dab9b41358df920d1f588

@@ -29,13 +29,8 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 import io
 from xml.sax.saxutils import escape
 from core.models import Usuario
-<<<<<<< HEAD
 
 
-
-=======
- 
->>>>>>> e1d0f53f4f503511855dab9b41358df920d1f588
 def _role_route_name(user) -> str:
     """Devuelve el nombre de la ruta según el rol del usuario."""
     if user.is_superuser:
@@ -111,7 +106,6 @@ def login_view(request):
         tipo_usuario = (request.POST.get("tipo_usuario") or tipo_default or "").strip()
  
         user = authenticate(request, username=usuario, password=contrasena)
-<<<<<<< HEAD
 
         # Si falla con username, intentar con email
         if user is None and "@" in usuario:
@@ -123,9 +117,6 @@ def login_view(request):
             except (UserModel.DoesNotExist, UserModel.MultipleObjectsReturned):
                 user = None
 
-=======
- 
->>>>>>> e1d0f53f4f503511855dab9b41358df920d1f588
         def _rerender_error(msg):
             messages.error(request, msg)
             ctx = {
@@ -390,7 +381,6 @@ Sistema de Patrimonio Hospital Romero
                 {"usuario_o_email": identificador, "tipo_usuario": tipo_usuario},
                 status=400,
             )
-<<<<<<< HEAD
 
         if tipo_usuario not in ["operador", "supervisor"]:
             messages.error(request, "Rol no válido. Seleccioná Operador o Supervisor.")
@@ -401,17 +391,12 @@ Sistema de Patrimonio Hospital Romero
                 status=400,
             )
 
-
-=======
- 
->>>>>>> e1d0f53f4f503511855dab9b41358df920d1f588
         crear_notificacion_admins(
             f"El {tipo_usuario} '{identificador}' solicitó recuperación de contraseña."
         )
         messages.success(request, "Solicitud enviada correctamente. Un administrador revisará tu pedido.")
         return redirect("recuperar_password")
     return render(request, "recuperar_password.html")
-<<<<<<< HEAD
 
 
 def resetear_password(request, token):
@@ -457,11 +442,6 @@ def resetear_password(request, token):
     return render(request, "resetear_password.html", {"token": token})
 
 
-
-=======
- 
- 
->>>>>>> e1d0f53f4f503511855dab9b41358df920d1f588
 @login_required
 def alta_operadores(request):
     perms = permisos_context(request.user)
@@ -643,37 +623,34 @@ def editar_operador(request, pk):
             hubo_cambio = True
         else:
             operador.email = email_normalizado
-<<<<<<< HEAD
-=======
- 
+
         is_active_nuevo = estado == "habilitado"
         if operador.is_active != is_active_nuevo:
             operador.is_active = is_active_nuevo
             hubo_cambio = True
         else:
             operador.is_active = is_active_nuevo
- 
+
         if hasattr(operador, "estado"):
             if operador.estado != estado:
                 operador.estado = estado
                 hubo_cambio = True
             else:
                 operador.estado = estado
- 
+
         if hasattr(operador, "pais"):
             if operador.pais != pais:
                 operador.pais = pais
                 hubo_cambio = True
             else:
                 operador.pais = pais
- 
+
         if hasattr(operador, "numero_doc"):
             if operador.numero_doc != numero_doc:
                 operador.numero_doc = numero_doc
                 hubo_cambio = True
             else:
                 operador.numero_doc = numero_doc
->>>>>>> e1d0f53f4f503511855dab9b41358df920d1f588
 
         if hasattr(operador, "tipo_usuario"):
             if operador.tipo_usuario != tipo_usuario:
@@ -977,7 +954,6 @@ def reportes_pdf(request):
         resp = HttpResponse(pdf_bytes, content_type="application/pdf")
         resp["Content-Disposition"] = f'inline; filename="reporte_{scope}_fallback.pdf"'
         return resp
-<<<<<<< HEAD
 
 
 @login_required
@@ -2190,9 +2166,6 @@ def crear_notificacion_admins(mensaje):
     for admin in admins:
         crear_notificacion(admin, mensaje)
 
-=======
- 
->>>>>>> e1d0f53f4f503511855dab9b41358df920d1f588
 @login_required
 def agregar_servicio_ajax(request):
     if request.method != "POST":
