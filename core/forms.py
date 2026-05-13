@@ -5,20 +5,17 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.contrib.auth import get_user_model
-from django.contrib.auth.password_validation import validate_password
 from core.models import BienPatrimonial
 from core.models.expediente import Expediente
 from datetime import date
 
 
-
-# ========== FORMULARIO DE CARGA MASIVA ==========
 class MultipleFileInput(forms.ClearableFileInput):
     allow_multiple_selected = True
 
 class MultipleFileField(forms.FileField):
     def __init__(self, *args, **kwargs):
-        kwargs.setdefault("widget", MultipleFileInput(attrs={'class': 'form-control', 'accept': '.xlsx,.xls,.xlsm,.xlsb,.ods,.csv'}))
+        kwargs.setdefault("widget", MultipleFileInput(attrs={'class': 'form-control', 'accept': '.xlsx,.xls,.xlsm,.xlsb,.ods'}))
         super().__init__(*args, **kwargs)
 
     def clean(self, data, initial=None):
@@ -27,16 +24,18 @@ class MultipleFileField(forms.FileField):
             return [single_file_clean(d, initial) for d in data]
         return single_file_clean(data, initial)
 
+
+# ========== FORMULARIO DE CARGA MASIVA ==========
 class CargaMasivaForm(forms.Form):
     archivo_excel = MultipleFileField(
         label='Seleccionar archivo(s) Excel',
-        help_text='Formatos soportados: .xlsx, .xls, .xlsm, .xlsb, .ods, .csv'
+        help_text='Formatos soportados: .xlsx, .xls, .xlsm, .xlsb, .ods'
     )
     servicio = forms.CharField(
         max_length=100,
         required=False,
         label='Servicio por defecto (opcional)',
-        help_text='Si se deja vacío, se tomará el servicio de cada fila del archivo. Si el archivo se llama "RELEVAMIENTO...", se asignará automáticamente.',
+        help_text='Si se deja vacío, se tomará el servicio de cada fila del archivo.',
         widget=forms.TextInput(attrs={'class': 'form-control'})
     )
 
@@ -50,8 +49,8 @@ class BienPatrimonialForm(forms.ModelForm):
         model = BienPatrimonial
         fields = [
             'descripcion', 'cantidad', 'expediente', 'cuenta_codigo', 'nomenclatura_bienes',
-            'numero_serie', 'numero_identificacion', 'numero_compra', 'origen', 'estado', 'servicios',
-            'observaciones', 'siem', 'valor_adquisicion', 'fecha_adquisicion', 'fecha_baja',
+            'numero_serie', 'numero_identificacion', 'origen', 'estado', 'servicios',
+            'observaciones', 'valor_adquisicion', 'fecha_adquisicion', 'fecha_baja',
         ]
         error_messages = {
             'descripcion': {'required': 'Este campo es obligatorio.'},
@@ -66,12 +65,10 @@ class BienPatrimonialForm(forms.ModelForm):
             'nomenclatura_bienes': forms.TextInput(attrs={'class': 'form-control'}),
             'numero_serie': forms.TextInput(attrs={'class': 'form-control'}),
             'numero_identificacion': forms.TextInput(attrs={'class': 'form-control'}),
-            'numero_compra': forms.TextInput(attrs={'class': 'form-control'}),
             'origen': forms.Select(attrs={'class': 'form-select'}),
             'estado': forms.Select(attrs={'class': 'form-select'}),
             'servicios': forms.Select(attrs={'class': 'form-select flex-grow-1'}),
             'observaciones': forms.Textarea(attrs={'rows': 2, 'class': 'form-control'}),
-            'siem': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'valor_adquisicion': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': 0}),
             'fecha_adquisicion': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'fecha_baja': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
@@ -88,9 +85,7 @@ class BienPatrimonialForm(forms.ModelForm):
         exp = getattr(self.instance, "expediente", None)
         if exp:
             self.fields["numero_expediente"].initial = exp.numero_expediente
-            # Si el bien no tiene numero_compra propio, podemos usar el del expediente como inicial
-            if not self.instance.numero_compra:
-                self.fields["numero_compra"].initial = exp.numero_compra
+            self.fields["numero_compra"].initial = exp.numero_compra
 
         # ===== SERVICIOS: fijos + extras, ordenados alfabéticamente =====
         from core.models.servicio_extra import ServicioExtra
@@ -229,8 +224,11 @@ class BienPatrimonialForm(forms.ModelForm):
         if n_cmp and not n_exp:
             self.add_error("numero_expediente", "Si informás N° de compra, debés indicar el N° de Expediente.")
 
+<<<<<<< HEAD
 
         # Precio: si el origen no es COMPRA, ignorar precio
+=======
+>>>>>>> e1d0f53f4f503511855dab9b41358df920d1f588
         if cleaned.get("origen") and cleaned["origen"] != "COMPRA":
             cleaned["valor_adquisicion"] = None
 
@@ -254,8 +252,7 @@ class BienPatrimonialForm(forms.ModelForm):
         expediente = None
         if n_exp:
             expediente, _ = Expediente.objects.get_or_create(numero_expediente=n_exp)
-            # Opcionalmente actualizamos el numero_compra del expediente si se cambió en el bien
-            if n_cmp and (not expediente.numero_compra or expediente.numero_compra != n_cmp):
+            if n_cmp and expediente.numero_compra != n_cmp:
                 expediente.numero_compra = n_cmp
                 expediente.save()
         else:
@@ -279,7 +276,7 @@ class OperadorForm(forms.Form):
         required=True,
         label='DNI',
         validators=[
-            RegexValidator(r'^\d{1,8}$', 'El DNI debe tener hasta 8 números.')
+            RegexValidator(r'^\d{1,8}$', 'El DNI debe tener sólo números y hasta 8 dígitos.')
         ]
     )
     email = forms.EmailField(required=False, label='Email')
@@ -288,30 +285,33 @@ class OperadorForm(forms.Form):
         initial='operador',
         label='Tipo de Usuario'
     )
-    password = forms.CharField(
-        required=False,
-        widget=forms.PasswordInput,
-        label='Contraseña',
-        help_text='Mínimo 8 caracteres, mayúscula, minúscula, número y carácter especial (Ej: Lm9!abcd).'
+    estado = forms.ChoiceField(
+        choices=[('habilitado', 'Habilitado'), ('no-habilitado', 'No Habilitado')],
+        initial='habilitado',
+        label='Estado'
     )
+    password = forms.CharField(required=False, widget=forms.PasswordInput, label='Contraseña')
 
     def __init__(self, *args, operador_pk=None, **kwargs):
         self.operador_pk = operador_pk
         super().__init__(*args, **kwargs)
         if self.operador_pk:
             self.fields['dni'].required = False
-        else:
-            self.fields['password'].required = True
 
     def clean_dni(self):
         dni = (self.cleaned_data.get('dni') or '').strip()
         if not dni:
             return dni
+<<<<<<< HEAD
 
         if not dni.isdigit() or not (1 <= len(dni) <= 8):
             raise ValidationError('El DNI debe tener hasta 8 números.')
 
 
+=======
+        if not dni.isdigit() or len(dni) > 8:
+            raise ValidationError('El DNI debe tener sólo números y hasta 8 dígitos.')
+>>>>>>> e1d0f53f4f503511855dab9b41358df920d1f588
         Operador = get_user_model()
         operadores = Operador.objects.filter(numero_doc__iexact=dni)
         if self.operador_pk:
@@ -330,6 +330,7 @@ class OperadorForm(forms.Form):
             operadores = operadores.exclude(pk=self.operador_pk)
         if operadores.exists():
             raise ValidationError('Ya existe un operador con ese email')
+<<<<<<< HEAD
         return email
 
     def clean_password(self):
@@ -355,3 +356,6 @@ class OperadorForm(forms.Form):
             raise ValidationError(e.messages)
 
         return password
+=======
+        return email
+>>>>>>> e1d0f53f4f503511855dab9b41358df920d1f588
