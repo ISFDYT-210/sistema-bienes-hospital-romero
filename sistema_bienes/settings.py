@@ -4,7 +4,7 @@ import os
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-SECRET_KEY = 
+SECRET_KEY = 'ery@#b7zsbl^vsz!d(qu86q^p(g__sk=^jkq(x2(zg0r^rna8_'
 DEBUG = True
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']

@@ -53,6 +53,11 @@ class BienPatrimonialForm(forms.ModelForm):
             'numero_serie', 'numero_identificacion', 'numero_compra', 'origen', 'estado', 'servicios',
             'observaciones', 'siem', 'valor_adquisicion', 'fecha_adquisicion', 'fecha_baja',
         ]
+        error_messages = {
+            'descripcion': {'required': 'Este campo es obligatorio.'},
+            'cantidad':    {'required': 'Este campo es obligatorio.'},
+            'origen':      {'required': 'Este campo es obligatorio.'},
+        }
         widgets = {
             'descripcion': forms.Textarea(attrs={'rows': 2, 'class': 'form-control'}),
             'cantidad': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
@@ -64,7 +69,7 @@ class BienPatrimonialForm(forms.ModelForm):
             'numero_compra': forms.TextInput(attrs={'class': 'form-control'}),
             'origen': forms.Select(attrs={'class': 'form-select'}),
             'estado': forms.Select(attrs={'class': 'form-select'}),
-            'servicios': forms.Select(attrs={'class': 'form-select'}),
+            'servicios': forms.Select(attrs={'class': 'form-select flex-grow-1'}),
             'observaciones': forms.Textarea(attrs={'rows': 2, 'class': 'form-control'}),
             'siem': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'valor_adquisicion': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': 0}),
@@ -197,9 +202,23 @@ class BienPatrimonialForm(forms.ModelForm):
         todos = sorted(set(SERVICIOS_FIJOS + extras))
         choices = [('', '— Seleccionar servicio —')] + [(s, s) for s in todos]
         self.fields["servicios"].widget.choices = choices
-        
+
+        origen_choices = [('', '— Seleccionar origen —')] + list(self.fields["origen"].choices)
+        self.fields["origen"].choices = origen_choices
+        self.fields["origen"].required = False  # manejado por clean_origen
+        self.fields["origen"].initial = ''       # no pre-seleccionar el default del modelo
+
+    def clean_origen(self):
+        value = self.cleaned_data.get("origen")
+        if not value:
+            raise forms.ValidationError("Este campo es obligatorio.")
+        return value
+
     def clean_servicios(self):
-        return self.cleaned_data.get("servicios") or ""
+        value = self.cleaned_data.get("servicios")
+        if not value:
+            raise forms.ValidationError("Este campo es obligatorio.")
+        return value
     
     def clean(self):
         cleaned = super().clean()
