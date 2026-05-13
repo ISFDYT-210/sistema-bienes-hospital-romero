@@ -79,6 +79,12 @@ class BienPatrimonial(models.Model):
         blank=True,
         verbose_name="Número de ID",
     )
+    numero_compra = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        verbose_name="N° de Compra",
+    )
 
     # Monto (solo si origen = COMPRA, lo validamos en clean)
     valor_adquisicion = models.DecimalField(
@@ -95,6 +101,8 @@ class BienPatrimonial(models.Model):
 
     servicios = models.CharField(max_length=200, blank=True, verbose_name="Servicios")
     observaciones = models.TextField(blank=True, null=True, verbose_name="Observaciones")
+    # Fecha SIEM (campo nuevo para almacenar fechas SIEM)
+    siem = models.DateField(null=True, blank=True, verbose_name="SIEM")
 
     # --- Campos de BAJA ---
     fecha_baja = models.DateField(

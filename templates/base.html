@@ -1,16 +1,20 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="{% if tema_oscuro %}dark{% else %}light{% endif %}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Sistema de Gestión de Bienes Patrimoniales{% endblock %}</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Encode+Sans:wght@400;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
     <link rel="stylesheet" href="{% static 'libs/fontawesome/css/all.min.css' %}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{% static 'libs/bootstrap/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
     <link rel="stylesheet" href="{% static 'css/notificaciones.css' %}">
 
@@ -23,6 +27,7 @@
 
     {% block extra_css %}{% endblock %}
 </head>
+
 <body>
     {% block header %}
         {% include 'includes/header.html' %}
@@ -39,71 +44,150 @@
 
     <!-- Bootstrap -->
     {% if messages %}
-    <div id="toast-container" style="
-        position: fixed;
-        top: 70px;
-        right: 24px;
-        z-index: 9999;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        max-width: 360px;
-    ">
-        {% for message in messages %}
-        <div class="django-toast" style="
+    <style>
+        #toast-container {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-width: 380px;
+            width: calc(100% - 48px);
+            pointer-events: none;
+        }
+        .django-toast {
+            pointer-events: auto;
             display: flex;
             align-items: flex-start;
-            gap: 12px;
-            padding: 16px 18px;
-            border-radius: 12px;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.10);
-            font-size: 14px;
-            line-height: 1.5;
+            gap: 14px;
+            padding: 16px 20px;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08), 0 3px 10px rgba(0,0,0,0.04);
+            background: #ffffff !important;
+            color: #1f2937 !important;
+            position: relative;
             opacity: 0;
             transform: translateX(40px);
             transition: opacity 350ms cubic-bezier(.2,.8,.2,1), transform 350ms cubic-bezier(.2,.8,.2,1);
-            {% if 'error' in message.tags %}
-                background: linear-gradient(135deg, #fff0f0, #ffe5e5);
-                border-left: 5px solid #e53935;
-                color: #b71c1c;
-            {% elif 'warning' in message.tags %}
-                background: linear-gradient(135deg, #fffde7, #fff8e1);
-                border-left: 5px solid #f9a825;
-                color: #7a5500;
-            {% elif 'success' in message.tags %}
-                background: linear-gradient(135deg, #f0fdf4, #e8f5e9);
-                border-left: 5px solid #43a047;
-                color: #1b5e20;
-            {% else %}
-                background: linear-gradient(135deg, #f0f4ff, #e8eeff);
-                border-left: 5px solid #1e88e5;
-                color: #0d47a1;
-            {% endif %}
-        ">
-            <span style="font-size:22px; flex-shrink:0; margin-top:1px;">
-                {% if 'error' in message.tags %}❌
-                {% elif 'warning' in message.tags %}⚠️
-                {% elif 'success' in message.tags %}✅
-                {% else %}ℹ️
+        }
+        .django-toast-success {
+            border-left: 6px solid #43a047 !important;
+        }
+        .django-toast-error {
+            border-left: 6px solid #e53935 !important;
+        }
+        .django-toast-warning {
+            border-left: 6px solid #f9a825 !important;
+        }
+        .django-toast-info {
+            border-left: 6px solid #1e88e5 !important;
+        }
+        .django-toast-title {
+            font-family: 'Encode Sans', sans-serif !important;
+            font-weight: 700 !important;
+            font-size: 14px !important;
+            margin-bottom: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .django-toast-success .django-toast-title {
+            color: #2e7d32 !important;
+        }
+        .django-toast-error .django-toast-title {
+            color: #e53935 !important;
+        }
+        .django-toast-warning .django-toast-title {
+            color: #f9a825 !important;
+        }
+        .django-toast-info .django-toast-title {
+            color: #1e88e5 !important;
+        }
+        .django-toast-body {
+            font-family: 'Roboto', sans-serif !important;
+            font-size: 14px !important;
+            line-height: 1.5;
+            color: #4b5563 !important;
+            padding-right: 15px;
+        }
+        .django-toast-close {
+            background: none !important;
+            border: none !important;
+            cursor: pointer !important;
+            color: #9ca3af !important;
+            font-size: 20px !important;
+            font-weight: bold !important;
+            line-height: 1 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            transition: color 0.2s !important;
+            position: absolute !important;
+            top: 12px;
+            right: 12px;
+        }
+        .django-toast-close:hover {
+            color: #4b5563 !important;
+        }
+    </style>
+    <div id="toast-container">
+        {% for message in messages %}
+        <div class="django-toast {% if 'error' in message.tags %}django-toast-error{% elif 'warning' in message.tags %}django-toast-warning{% elif 'success' in message.tags %}django-toast-success{% else %}django-toast-info{% endif %}">
+            <span style="font-size: 18px; flex-shrink: 0; margin-top: 1px;">
+                {% if 'error' in message.tags %}
+                    <i class="fa-solid fa-xmark" style="color: #e53935;"></i>
+                {% elif 'warning' in message.tags %}
+                    <i class="fa-solid fa-triangle-exclamation" style="color: #f9a825;"></i>
+                {% elif 'success' in message.tags %}
+                    <i class="fa-solid fa-check" style="color: #43a047;"></i>
+                {% else %}
+                    <i class="fa-solid fa-info" style="color: #1e88e5;"></i>
                 {% endif %}
             </span>
-            <div style="flex:1;">
-                <div style="font-weight:700; font-size:13px; margin-bottom:3px; text-transform:uppercase; letter-spacing:0.5px; opacity:0.7;">
-                    {% if 'error' in message.tags %}Error
-                    {% elif 'warning' in message.tags %}Advertencia
-                    {% elif 'success' in message.tags %}Éxito
-                    {% else %}Información
-                    {% endif %}
+            <div style="flex: 1;">
+                <div class="django-toast-title">
+                    {% if 'error' in message.tags %}Error{% elif 'warning' in message.tags %}Advertencia{% elif 'success' in message.tags %}Éxito{% else %}Información{% endif %}
                 </div>
-                <div>{{ message }}</div>
+                <div class="django-toast-body">{{ message }}</div>
             </div>
+            <button type="button" class="django-toast-close" onclick="var t = this.closest('.django-toast'); t.style.opacity = '0'; t.style.transform = 'translateX(40px)'; setTimeout(function() { t.remove(); }, 350);">&times;</button>
         </div>
         {% endfor %}
     </div>
     {% endif %}
     <script src="{% static 'libs/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
     <script src="{% static 'js/base.js' %}"></script>
     <script src="{% static 'js/notificaciones.js' %}"></script>
+
+    <script>
+    // Global Flatpickr initialization
+    document.addEventListener('DOMContentLoaded', function() {
+        const initFlatpickr = () => {
+            flatpickr('input[type="date"]', {
+                locale: 'es',
+                dateFormat: 'Y-m-d',
+                altInput: true,
+                altFormat: 'd/m/Y',
+                allowInput: true,
+                disableMobile: true // Use flatpickr even on mobile for consistent UI
+            });
+        };
+        initFlatpickr();
+
+        // Re-init when dynamic content is added (MutationObserver)
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.addedNodes.length) {
+                    initFlatpickr();
+                }
+            });
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+    });
+    </script>
+
 
     <script>
     (function() {
@@ -176,17 +260,30 @@
     // En paginas que NO son home, marcar que el usuario esta "dentro" de la app
     // para que el guard del home sepa que no debe cerrar sesion al volver.
     (function () {
-        var navType = 'navigate';
-        try {
-            var e = performance.getEntriesByType('navigation');
-            if (e.length) navType = e[0].type;
-        } catch (_) {}
-        if (navType === 'navigate') {
-            sessionStorage.setItem('appBeyondHome', '1');
-        }
+        sessionStorage.setItem('appBeyondHome', '1');
     })();
     </script>
     {% endif %}
+
+    <script>
+    // Limpiar selección masiva de bienes al salir de las listas
+    (function(){
+        const path = window.location.pathname;
+        const urlListaBienes = '{% url "lista_bienes" %}';
+        const urlListaBienesOp = '{% url "lista_bienes_operador" %}';
+        const urlListaBajas = '{% url "lista_baja_bienes" %}';
+
+        // Si la URL actual no es ninguna de las listas de bienes activos, limpiamos el localStorage de bajas
+        if (path !== urlListaBienes && path !== urlListaBienesOp) {
+            localStorage.removeItem('bienes_baja_seleccionados');
+        }
+        // Si la URL actual no es la lista de bienes dados de baja, limpiamos el localStorage de restaurar
+        if (path !== urlListaBajas) {
+            localStorage.removeItem('bienesARestablecer');
+        }
+    })();
+
+    </script>
 
     {% block extra_js %}{% endblock %}
 </body>

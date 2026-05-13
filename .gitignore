@@ -77,15 +77,17 @@ migrate_utf8.log
 htmlcov/
 .coverage.*
 
-# Migrations (excluye archivos .py pero mantiene el __init__.py)
+# Migrations: ignorar archivos generados automáticamente, excepto el inicial
 */migrations/*.py
 !*/migrations/__init__.py
+!core/migrations/0001_initial.py
+!core/migrations/0002_add_missing_fields.py
 */migrations/*.pyc
 
-# Vercel (deployment personal - no subir al repo)
+# Vercel
 vercel.json
 
-# Scripts personales / temporales (no subir al repo)
+# Scripts personales / temporales
 merge_upstream.py
 fix_all_conflicts.py
 fix_views.py
@@ -97,15 +99,13 @@ setup_test_users.py
 python
 sistema_bienes/settings_local.py
 
-# Scripts de configuración y archivos de debug (no subir)
-crear_admin.py
+# Scripts de configuración y archivos de debug
 check_cols.py
 core/views_cleaned.py
 
-# Archivos Excel de datos reales (nunca subir al repo)
+# Archivos Excel de datos reales
 *.xls
 *.xlsx
 *.ods
 *.xlsm
 *.xlsb
-
