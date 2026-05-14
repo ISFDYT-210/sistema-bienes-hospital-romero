@@ -52,6 +52,7 @@ urlpatterns = [
     # Acciones sobre bajas
     path('bienes/<int:pk>/dar-baja/', views.dar_baja_bien, name='dar_baja_bien'),
     path('bienes/<int:pk>/restablecer/', views.restablecer_bien, name='restablecer_bien'),
+    path('bienes/restablecer-seleccionados/', views.restablecer_bienes_seleccionados, name='restablecer_bienes_seleccionados'),
     path('bienes/<int:pk>/eliminar-definitivo/', views.eliminar_bien_definitivo, name='eliminar_bien_definitivo'),
 
     # Carga masiva
