@@ -50,7 +50,7 @@ class BienPatrimonialForm(forms.ModelForm):
         fields = [
             'descripcion', 'cantidad', 'expediente', 'cuenta_codigo', 'nomenclatura_bienes',
             'numero_serie', 'numero_identificacion', 'origen', 'estado', 'servicios',
-            'observaciones', 'valor_adquisicion', 'fecha_adquisicion', 'fecha_baja',
+            'observaciones', 'valor_adquisicion', 'fecha_adquisicion', 'fecha_baja', 'siem',
         ]
         error_messages = {
             'descripcion': {'required': 'Este campo es obligatorio.'},
@@ -72,6 +72,7 @@ class BienPatrimonialForm(forms.ModelForm):
             'valor_adquisicion': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': 0}),
             'fecha_adquisicion': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'fecha_baja': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'siem': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
         }
 
     def __init__(self, *args, **kwargs):
