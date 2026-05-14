@@ -34,6 +34,7 @@ urlpatterns = [
     path('base/', views.base, name='base'),
     path("reportes/", views.reportes_view, name="reportes"),
     path("reportes/pdf/", views.reportes_pdf, name="reportes_pdf"),
+    path("reportes/registro-pdf/", views.registro_pdf, name="registro_pdf"),
     path('servicios/agregar/', views.agregar_servicio, name='agregar_servicio'),
     path('servicios/agregar-ajax/', views.agregar_servicio_ajax, name='agregar_servicio_ajax'),
 
@@ -41,6 +42,7 @@ urlpatterns = [
     path('bienes/<int:pk>/editar/', views.editar_bien, name='editar_bien'),
     path('bienes/<int:pk>/eliminar/', views.eliminar_bien, name='eliminar_bien'),
     path('bienes/eliminar-seleccionados/', views.eliminar_bienes_seleccionados, name='eliminar_bienes_seleccionados'),
+    path('bienes/dar-baja-seleccionados/', views.dar_baja_bienes_seleccionados, name='dar_baja_bienes_seleccionados'),
 
     # Listas
     path('lista-bienes/', views.lista_bienes, name='lista_bienes'),

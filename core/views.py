@@ -781,7 +781,6 @@ def reportes_pdf(request):
             .filter(Q(fecha_adquisicion__gte=since_date) | Q(fecha_baja__gte=since_date))
             .order_by("-fecha_baja", "-fecha_adquisicion", "pk")
         )
-        notifs = Notificacion.objects.filter(fecha__gte=since_dt).order_by("-fecha")
         rango_desc = "Últimas 24 horas"
     else:
         bienes = (
@@ -789,15 +788,12 @@ def reportes_pdf(request):
             .select_related("expediente")
             .order_by("-fecha_adquisicion", "pk")
         )
-        notifs = Notificacion.objects.none()
         rango_desc = "Todos"
- 
+
     ctx = {
         "bienes": bienes,
-        "notifs": notifs,
         "rango_desc": rango_desc,
         "generado_en": now,
-        "usuario": request.user,
         **permisos_context(request.user),
     }
  
@@ -924,35 +920,145 @@ def reportes_pdf(request):
  
         table.setStyle(ts)
         elems.append(table)
- 
-        if notifs:
-            elems.append(Spacer(1, 10))
-            elems.append(Paragraph("Acciones registradas", styles["Heading3"]))
-            notif_data = [[P("Fecha", True), P("Mensaje", True)]]
-            for n in notifs:
-                notif_data.append([
-                    P(timezone.localtime(n.fecha).strftime("%d/%m/%Y %H:%M")),
-                    P(n.mensaje),
-                ])
-            nt_col_w = [3.2 * cm, usable_w - 3.2 * cm]
-            nt = Table(notif_data, repeatRows=1, colWidths=nt_col_w)
-            nt.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f2f2f2")),
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#cccccc")),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 4),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-                ("TOPPADDING", (0, 0), (-1, -1), 3),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-            ]))
-            elems.append(nt)
- 
+
         doc.build(elems)
         pdf_bytes = bio.getvalue()
         bio.close()
  
         resp = HttpResponse(pdf_bytes, content_type="application/pdf")
         resp["Content-Disposition"] = f'inline; filename="reporte_{scope}_fallback.pdf"'
+        return resp
+
+
+@login_required
+def registro_pdf(request):
+    scope = (request.GET.get("scope") or "24h").lower()
+    now = timezone.now()
+
+    hours_map = {"24h": 24, "12h": 12, "6h": 6}
+    if scope in hours_map:
+        since_dt = now - timedelta(hours=hours_map[scope])
+        notifs = Notificacion.objects.filter(fecha__gte=since_dt).order_by("-fecha")
+        rango_desc = f"Últimas {hours_map[scope]} horas"
+    else:
+        notifs = Notificacion.objects.order_by("-fecha")
+        rango_desc = "Historial completo"
+
+    ctx = {
+        "notifs": notifs,
+        "rango_desc": rango_desc,
+        "generado_en": now,
+        **permisos_context(request.user),
+    }
+
+    try:
+        from weasyprint import HTML, CSS
+
+        html_str = render_to_string("registro_pdf.html", ctx, request=request)
+        pdf_bytes = HTML(
+            string=html_str,
+            base_url=request.build_absolute_uri("/"),
+        ).write_pdf(
+            stylesheets=[
+                CSS(
+                    string="""
+                @page { size: A4; margin: 1.5cm; }
+                body { font-family: sans-serif; font-size: 12px; }
+                h1,h2,h3 { margin: 0 0 .4rem 0; }
+                table { width: 100%; border-collapse: collapse; }
+                th, td { border: 1px solid #ddd; padding: 6px; vertical-align: top; }
+                thead th { background: #f2f2f2; }
+                .muted { color: #666; }
+            """
+                )
+            ]
+        )
+        resp = HttpResponse(pdf_bytes, content_type="application/pdf")
+        resp["Content-Disposition"] = f'inline; filename="registro_actividad_{scope}.pdf"'
+        return resp
+
+    except Exception:
+        styles = getSampleStyleSheet()
+        title_style = styles["Title"]
+        meta_style = styles["Normal"]
+
+        p_cell = ParagraphStyle(
+            "p_cell",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=9,
+            leading=11,
+            wordWrap="CJK",
+            spaceAfter=0,
+        )
+        p_head = ParagraphStyle(
+            "p_head",
+            parent=p_cell,
+            fontName="Helvetica-Bold",
+        )
+
+        def P(texto, head: bool = False):
+            if texto is None or texto == "":
+                texto = "—"
+            txt = escape(str(texto)).replace("\n", "<br/>")
+            return Paragraph(txt, p_head if head else p_cell)
+
+        bio = io.BytesIO()
+        doc = SimpleDocTemplate(
+            bio,
+            pagesize=A4,
+            leftMargin=1.5 * cm,
+            rightMargin=1.5 * cm,
+            topMargin=1.5 * cm,
+            bottomMargin=1.5 * cm,
+        )
+        elems = []
+
+        title = f"Registro de Actividad – {rango_desc}"
+        meta = f"Generado: {timezone.localtime(now).strftime('%d/%m/%Y %H:%M')} · Usuario: {request.user.username}"
+        elems.append(Paragraph(title, title_style))
+        elems.append(Paragraph(meta, meta_style))
+        elems.append(Spacer(1, 8))
+
+        page_w, _ = A4
+        usable_w = page_w - (doc.leftMargin + doc.rightMargin)
+        col_fecha = 3.2 * cm
+        col_usuario = 3.2 * cm
+        col_mensaje = usable_w - col_fecha - col_usuario
+
+        data = [[P("Fecha", True), P("Usuario", True), P("Mensaje", True)]]
+        for n in notifs:
+            data.append([
+                P(timezone.localtime(n.fecha).strftime("%d/%m/%Y %H:%M")),
+                P(n.usuario.username if n.usuario_id else "—"),
+                P(n.mensaje),
+            ])
+
+        table = Table(data, repeatRows=1, colWidths=[col_fecha, col_usuario, col_mensaje])
+        ts = TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f2f2f2")),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, 0), 10),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#cccccc")),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ])
+        for i in range(1, len(data)):
+            if i % 2 == 0:
+                ts.add("BACKGROUND", (0, i), (-1, i), colors.whitesmoke)
+        table.setStyle(ts)
+        elems.append(table)
+
+        doc.build(elems)
+        pdf_bytes = bio.getvalue()
+        bio.close()
+
+        resp = HttpResponse(pdf_bytes, content_type="application/pdf")
+        resp["Content-Disposition"] = f'inline; filename="registro_actividad_{scope}.pdf"'
         return resp
 
 
