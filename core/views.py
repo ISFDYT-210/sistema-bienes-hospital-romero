@@ -782,6 +782,7 @@ def reportes_pdf(request):
         )
         rango_desc = "Todos"
 
+
     ctx = {
         "bienes": bienes,
         "rango_desc": rango_desc,
@@ -864,16 +865,15 @@ def reportes_pdf(request):
         elems.append(Spacer(1, 8))
  
         data = [[
-            P("ID", True), P("Clave", True), P("Descripción", True), P("Servicios", True),
+            P("Clave", True), P("Descripción", True), P("Servicios", True),
             P("Estado", True), P("Alta", True), P("Baja", True), P("Valor", True),
         ]]
- 
+
         for b in bienes:
             estado = b.get_estado_display() if hasattr(b, "get_estado_display") else (b.estado or "—")
             alta = b.fecha_adquisicion.strftime("%d/%m/%Y") if b.fecha_adquisicion else "—"
             baja = b.fecha_baja.strftime("%d/%m/%Y") if b.fecha_baja else "—"
             data.append([
-                P(b.pk or ""),
                 P(b.clave_unica or "—"),
                 P(b.descripcion or "—"),
                 P(b.servicios or "—"),
@@ -882,10 +882,10 @@ def reportes_pdf(request):
                 P(baja),
                 P(money(b.valor_adquisicion)),
             ])
- 
+
         page_w, _ = A4
         usable_w = page_w - (doc.leftMargin + doc.rightMargin)
-        base_col_cm = [1.2, 2.0, 9.0, 2.2, 2.0, 2.0, 2.0, 1.6]
+        base_col_cm = [2.2, 9.0, 2.2, 2.0, 2.0, 2.0, 1.8]
         base_col_pts = [w * cm for w in base_col_cm]
         scale = float(usable_w) / float(sum(base_col_pts))
         col_widths = [w * scale for w in base_col_pts]
@@ -930,14 +930,14 @@ def registro_pdf(request):
     hours_map = {"24h": 24, "12h": 12, "6h": 6}
     if scope in hours_map:
         since_dt = now - timedelta(hours=hours_map[scope])
-        notifs = Notificacion.objects.filter(fecha__gte=since_dt).order_by("-fecha")
+        logs = LogActividad.objects.filter(fecha__gte=since_dt).order_by("-fecha")
         rango_desc = f"Últimas {hours_map[scope]} horas"
     else:
-        notifs = Notificacion.objects.order_by("-fecha")
+        logs = LogActividad.objects.all().order_by("-fecha")
         rango_desc = "Historial completo"
  
     ctx = {
-        "notifs": notifs,
+        "logs": logs,
         "rango_desc": rango_desc,
         "generado_en": now,
         **permisos_context(request.user),
@@ -1949,6 +1949,10 @@ def eliminar_bienes_seleccionados(request):
         return redirect("lista_bienes")
  
     eliminados = BienPatrimonial.objects.filter(pk__in=ids).delete()[0]
+    msg_masiva_del = f"Se eliminaron definitivamente {eliminados} bienes mediante selección masiva."
+    crear_notificacion_admins(msg_masiva_del)
+    registrar_log(request.user, 'ELIMINACION', msg_masiva_del)
+    
     messages.success(request, f"✅ Eliminados: {eliminados} bienes correctamente.")
     return redirect("lista_bienes")
  
@@ -2052,9 +2056,10 @@ def dar_baja_bien(request, pk):
     bien.save(update_fields=update_fields)
  
     nombre_bien = getattr(bien, "nombre", None) or getattr(bien, "descripcion", "Sin nombre")
-    crear_notificacion_admins(
-        f"Se dio de baja el bien '{nombre_bien}' (Clave: {bien.clave_unica})."
-    )
+    msg_baja = f"Se dio de baja el bien '{nombre_bien}' (Clave: {bien.clave_unica})."
+    crear_notificacion_admins(msg_baja)
+    registrar_log(request.user, 'BAJA', msg_baja)
+    
     messages.success(request, f"Bien '{nombre_bien}' dado de baja correctamente.")
     return redirect("lista_bienes")
  
@@ -2097,9 +2102,10 @@ def dar_baja_bienes_seleccionados(request):
         nombre = getattr(bien, "nombre", None) or getattr(bien, "descripcion", "Sin nombre")
         nombres_bienes.append(nombre)
  
-    crear_notificacion_admins(
-        f"Se dieron de baja {count} bienes: {', '.join(nombres_bienes[:5])}{'...' if count > 5 else ''}."
-    )
+    msg_baja_masiva = f"Se dieron de baja {count} bienes mediante selección masiva: {', '.join(nombres_bienes[:5])}{'...' if count > 5 else ''}."
+    crear_notificacion_admins(msg_baja_masiva)
+    registrar_log(request.user, 'BAJA', msg_baja_masiva)
+    
     messages.success(request, f"Se han dado de baja {count} bienes correctamente.")
     return redirect("lista_bienes")
  
@@ -2128,9 +2134,10 @@ def restablecer_bien(request, pk):
     bien.save(update_fields=update_fields)
  
     nombre_bien = getattr(bien, "nombre", None) or getattr(bien, "descripcion", "Sin nombre")
-    crear_notificacion_admins(
-        f"Se restableció el bien '{nombre_bien}' (Clave: {bien.clave_unica}) a ACTIVO."
-    )
+    msg_rest = f"Se restableció el bien '{nombre_bien}' (Clave: {bien.clave_unica}) a ACTIVO."
+    crear_notificacion_admins(msg_rest)
+    registrar_log(request.user, 'RESTABLECIMIENTO', msg_rest)
+    
     messages.success(request, f"Bien '{nombre_bien}' restablecido a ACTIVO.")
     return redirect("lista_bienes")
  
@@ -2196,10 +2203,11 @@ def eliminar_bien_definitivo(request, pk):
     bien = get_object_or_404(BienPatrimonial, pk=pk)
     identificador = bien.clave_unica or bien.pk
     nombre_bien = getattr(bien, "nombre", None) or getattr(bien, "descripcion", "Sin nombre")
+    msg_del_def = f"Se eliminó definitivamente el bien '{nombre_bien}' (Clave: {identificador})."
+    crear_notificacion_admins(msg_del_def)
+    registrar_log(request.user, 'ELIMINACION', msg_del_def)
+    
     bien.delete()
-    crear_notificacion_admins(
-        f"Se eliminó definitivamente el bien '{nombre_bien}' (Clave: {identificador})."
-    )
     messages.success(request, f"Bien '{nombre_bien}' eliminado definitivamente.")
     return redirect("lista_baja_bienes")
  
