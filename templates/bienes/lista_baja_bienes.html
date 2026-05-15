@@ -7,7 +7,7 @@
 {% block extra_css %}
 <style>
   tr.seleccionado-restaurar td {
-    background-color: #e8f5e9 !important;
+    background-color: rgba(25, 135, 84, 0.08) !important;
     border-top: 1.5px solid #198754 !important;
     border-bottom: 1.5px solid #198754 !important;
   }
@@ -25,7 +25,7 @@
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(135deg, rgba(25, 135, 84, 0.06) 0%, rgba(0, 0, 0, 0.02) 100%);
+    background: linear-gradient(135deg, rgba(25, 135, 84, 0.12) 0%, rgba(0, 0, 0, 0.02) 100%);
     pointer-events: none;
     border-radius: inherit;
   }
@@ -35,6 +35,17 @@
   .tabla-selection-mode .table tbody tr:not(.seleccionado-restaurar) td {
     color: #5a5a5a;
   }
+
+  /* Hacer filas seleccionables con cursor de mano y ocultar checkbox en modo restaurar */
+  .selectable-row td { cursor: pointer; }
+  .selectable-row td a,
+  .selectable-row td button,
+  .selectable-row td input,
+  .selectable-row td select,
+  .selectable-row td textarea { cursor: default; }
+
+  /* Ocultar visualmente los checkboxes de restaurar cuando la tabla está en modo selección */
+  .table-responsive.tabla-selection-mode .chk-restaurar { display: none !important; }
 
   .restaurar-multiple-panel {
     position: fixed;
@@ -152,7 +163,7 @@
       </a>
       {% if es_admin %}
       <button class="btn btn-success" type="button" id="btn-top-restaurar-multiple">
-        <i class="fas fa-undo me-1"></i> Restablecer varios bienes
+        <i class="fas fa-undo me-1"></i> Restablecer múltiples bienes
       </button>
       {% endif %}
     </div>
@@ -373,7 +384,7 @@
 
   <div id="restaurar-multiple-panel" class="restaurar-multiple-panel" role="dialog" aria-live="polite">
     <div class="restaurar-multiple-panel__body">
-      <h5 class="restaurar-multiple-panel__title">Restablecer varios bienes</h5>
+      <h5 class="restaurar-multiple-panel__title">Restablecer múltiples bienes</h5>
       <p class="restaurar-multiple-panel__text">Has seleccionado <span id="restaurar-multiple-count">0</span> bienes. Presioná confirmar para continuar.</p>
     </div>
     <div class="restaurar-multiple-panel__actions">
@@ -475,12 +486,20 @@
     function updateModeUI() {
       if (btnRestaurarMultiple) {
         const count = bienesParaRestaurar.size;
-        btnRestaurarMultiple.innerHTML = `<i class="fas fa-undo me-1"></i> Restablecer varios bienes${count > 0 ? ` (${count})` : ''}`;
+        btnRestaurarMultiple.innerHTML = `<i class="fas fa-undo me-1"></i> Restablecer múltiples bienes${count > 0 ? ` (${count})` : ''}`;
         btnRestaurarMultiple.classList.toggle('active', restaurarSelectionMode);
       }
-      if (tableBody) {
-        tableBody.classList.toggle('tabla-selection-mode', restaurarSelectionMode || bienesParaRestaurar.size > 0);
+
+      // Apply visual selection mode to the table container (same approach as lista_bienes)
+      const tableContainer = document.querySelector('.table-responsive');
+      if (tableContainer) {
+        tableContainer.classList.toggle('tabla-selection-mode', restaurarSelectionMode || bienesParaRestaurar.size > 0);
       }
+
+      // Toggle selectable rows and selection-column visibility
+      document.querySelectorAll('#tabla-bienes, table.table tbody tr').forEach(tr => tr.classList.toggle('selectable-row', restaurarSelectionMode));
+      document.querySelectorAll('.seleccion-col').forEach(el => el.classList.toggle('d-none', !restaurarSelectionMode));
+
       if (restaurarPanel) {
         restaurarPanel.classList.toggle('restaurar-multiple-panel--visible', restaurarSelectionMode);
       }
@@ -489,7 +508,7 @@
     function updateRestaurarMultipleUI() {
       if (!btnRestaurarMultiple) return;
       const count = bienesParaRestaurar.size;
-      btnRestaurarMultiple.innerHTML = `<i class="fas fa-undo me-1"></i> Restablecer varios bienes${count > 0 ? ` (${count})` : ''}`;
+      btnRestaurarMultiple.innerHTML = `<i class="fas fa-undo me-1"></i> Restablecer múltiples bienes${count > 0 ? ` (${count})` : ''}`;
     }
 
     function saveRestaurarState() {
@@ -605,7 +624,11 @@
           bienesParaRestaurar.forEach((_, pk_val) => {
             selectBienesRestaurar.innerHTML += `<option value="${pk_val}" selected></option>`;
           });
+          // Clear selection mode and persisted state before submitting so UI returns to normal
+          bienesParaRestaurar.clear();
           localStorage.removeItem(LS_KEY);
+          restaurarSelectionMode = false;
+          updateModeUI();
           formRestaurarMultiple.submit();
         }
       };

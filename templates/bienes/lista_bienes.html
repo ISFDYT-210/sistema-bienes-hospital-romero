@@ -360,26 +360,26 @@
               <a class="btn btn-sm btn-info" href="{% url 'editar_bien' b.pk %}" title="Editar">
                 <i class="fas fa-pen"></i>
               </a>
-              {% if es_admin %}
-              <button type="button" class="btn btn-sm btn-warning ms-1 btn-dar-baja"
-                      data-pk="{{ b.pk }}"
-                      data-action="{% url 'dar_baja_bien' b.pk %}"
-                      data-descripcion="{{ b.descripcion|escapejs }}"
-                      title="Dar de baja">
-                <i class="fas fa-level-down-alt"></i>
-              </button>
-              {% else %}
-              <a href="#"
-                 class="btn btn-sm btn-warning ms-1 btn-dar-baja"
-                 data-pk="{{ b.pk }}"
-                 data-action="{% url 'dar_baja_bien' b.pk %}"
-                 data-descripcion="{{ b.descripcion|escapejs }}"
-                 data-bs-toggle="offcanvas"
-                 data-bs-target="#offcanvasDarBaja"
-                 title="Dar de baja">
-                 <i class="fas fa-level-down-alt"></i>
-              </a>
-              {% endif %}
+                {% if es_admin %}
+                <button type="button" class="btn btn-sm btn-danger ms-1 btn-dar-baja"
+                     data-pk="{{ b.pk }}"
+                     data-action="{% url 'dar_baja_bien' b.pk %}"
+                     data-descripcion="{{ b.descripcion|escapejs }}"
+                     title="Dar de baja">
+                 <i class="fas fa-trash"></i>
+                </button>
+                {% else %}
+                <a href="#"
+                  class="btn btn-sm btn-danger ms-1 btn-dar-baja"
+                  data-pk="{{ b.pk }}"
+                  data-action="{% url 'dar_baja_bien' b.pk %}"
+                  data-descripcion="{{ b.descripcion|escapejs }}"
+                  data-bs-toggle="offcanvas"
+                  data-bs-target="#offcanvasDarBaja"
+                  title="Dar de baja">
+                  <i class="fas fa-trash"></i>
+                </a>
+                {% endif %}
             </td>
             {% endif %}
           </tr>
@@ -697,6 +697,18 @@
   document.addEventListener('click', function(e) {
     const btn = e.target.closest('.btn-dar-baja');
     if (!btn) return;
+
+    // If multi-selection mode is active, block individual dar-baja
+    if (bajaSelectionMode) {
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        alert('Desactivá Baja múltiple para dar de baja individual.');
+      } catch (err) {
+        // noop
+      }
+      return;
+    }
 
     e.preventDefault();
     const form = document.getElementById('form-dar-baja');
