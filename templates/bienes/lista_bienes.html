@@ -124,11 +124,12 @@
     </div>
 
     <!-- TOTAL -->
-    <div class="col-12 mt-2" style="font-family: var(--font-roboto); color: var(--secondary-gris); font-size: 14px;">
-      {% if q %}Mostrando resultados para: <strong>{{ q }}</strong> · {% endif %}
-      Mostrando {{ page_obj.paginator.count }} bienes en total
-    </div>
-  </form>
+    </form>
+    <div id="bienes-container">
+      <div class="col-12 mt-2" style="font-family: var(--font-roboto); color: var(--secondary-gris); font-size: 14px;">
+        {% if q %}Mostrando resultados para: <strong>{{ q }}</strong> · {% endif %}
+        Mostrando {{ page_obj.paginator.count }} bienes en total
+      </div>
 
   <!-- TABLA DE BIENES -->
   <form id="form-eliminar-bienes" method="post" action="{% url 'eliminar_bienes_seleccionados' %}">
@@ -301,6 +302,7 @@
     </nav>
   </div>
   {% endif %}
+  </div>
 
 
   {% include 'bienes/includes/offcanvas_dar_baja.html' %}
@@ -524,13 +526,49 @@
 })();
 </script>
 
-<!-- Autosubmit de filtros -->
+<!-- Autosubmit de filtros (AJAX) -->
 <script>
 (function () {
   const form = document.querySelector('#filtros-form');
-  if (!form) return;
+  const container = document.querySelector('#bienes-container');
+  if (!form || !container) return;
 
-  const requestSubmit = () => (form.requestSubmit ? form.requestSubmit() : form.submit());
+  const updateList = (url) => {
+    // Mostrar un estado de carga opcional si se desea
+    container.style.opacity = '0.5';
+    
+    fetch(url, {
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+    .then(response => response.text())
+    .then(html => {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const newContent = doc.querySelector('#bienes-container').innerHTML;
+      container.innerHTML = newContent;
+      container.style.opacity = '1';
+      
+      // Actualizar la URL en el navegador
+      window.history.pushState({}, '', url);
+      
+      // Re-inicializar comportamientos si es necesario
+      // En este caso, la mayoría de los botones de acciones usan delegación en el script de arriba
+    })
+    .catch(err => {
+      console.error('Error en fetch:', err);
+      container.style.opacity = '1';
+    });
+  };
+
+  const handleFormSubmit = (e) => {
+    if (e) e.preventDefault();
+    const formData = new FormData(form);
+    const params = new URLSearchParams(formData);
+    const url = `${window.location.pathname}?${params.toString()}`;
+    updateList(url);
+  };
 
   // Debounce para texto/búsqueda
   const debounce = (fn, ms) => {
@@ -540,9 +578,8 @@
       t = setTimeout(() => fn.apply(null, args), ms);
     };
   };
-  const debouncedSubmit = debounce(requestSubmit, 400);
+  const debouncedSubmit = debounce(handleFormSubmit, 400);
 
-  // Siempre resetear a página 1 ante cualquier cambio
   const ensurePageReset = () => {
     let pageInput = form.querySelector('input[name="page"]');
     if (!pageInput) {
@@ -554,27 +591,35 @@
     pageInput.value = '1';
   };
 
-  // Campos que disparan autosubmit
-  const autoEls = form.querySelectorAll('.auto-submit');
-
-  autoEls.forEach(el => {
+  // Escuchar cambios en campos de auto-submit
+  form.querySelectorAll('.auto-submit').forEach(el => {
     const tag = el.tagName;
     const type = (el.type || '').toLowerCase();
 
-    // Selects / fechas / checks → submit inmediato
     if (tag === 'SELECT' || (tag === 'INPUT' && (type === 'date' || type === 'checkbox' || type === 'radio'))) {
       el.addEventListener('change', () => {
         ensurePageReset();
-        requestSubmit();
+        handleFormSubmit();
       });
     }
 
-    // Texto / search → submit con debounce
     if (tag === 'INPUT' && (type === 'text' || type === 'search')) {
       el.addEventListener('input', () => {
         ensurePageReset();
         debouncedSubmit();
       });
+    }
+  });
+
+  // Interceptar el submit real del form por si acaso
+  form.addEventListener('submit', handleFormSubmit);
+
+  // Delegación para clics en paginación
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('.pagination .page-link');
+    if (link && link.getAttribute('href') && link.getAttribute('href') !== '#') {
+      e.preventDefault();
+      updateList(link.href);
     }
   });
 })();
