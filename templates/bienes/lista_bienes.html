@@ -361,12 +361,12 @@
                 <i class="fas fa-pen"></i>
               </a>
               {% if es_admin %}
-              <button type="button" class="btn btn-sm btn-danger ms-1 btn-eliminar-bien" 
+              <button type="button" class="btn btn-sm btn-warning ms-1 btn-dar-baja"
                       data-pk="{{ b.pk }}"
-                      data-action="{% url 'eliminar_bien' b.pk %}"
-                      data-bien="{{ b.descripcion|escapejs }}"
-                      title="Eliminar bien">
-                <i class="fas fa-trash-alt"></i>
+                      data-action="{% url 'dar_baja_bien' b.pk %}"
+                      data-descripcion="{{ b.descripcion|escapejs }}"
+                      title="Dar de baja">
+                <i class="fas fa-level-down-alt"></i>
               </button>
               {% else %}
               <a href="#"
@@ -455,9 +455,9 @@
   let bajaSelectionMode = false;
 
   const getSelectedItems = () => {
-    return Array.from(document.querySelectorAll('.chk-bien:checked')).map(chk => ({
-      pk: chk.value,
-      desc: chk.dataset.descripcion || ''
+    return Array.from(selectedIdSet).map(pk => ({
+      pk,
+      desc: selectedItemDescriptions.get(pk) || ''
     }));
   };
 
@@ -482,27 +482,73 @@
   const hiddenBajaInput = document.getElementById('baja-multiple-hidden');
   const hiddenSelectedIdsInput = document.getElementById('baja-selected-hidden');
 
-  const updateSelectionUI = () => {
-    const selectedItems = getSelectedItems();
-    const count = selectedItems.length;
-    if (hiddenSelectedIdsInput) {
-      hiddenSelectedIdsInput.value = selectedItems.map(item => item.pk).join(',');
-    }
+  const LS_KEY_BAJA_MULTI = 'bienesABajaMultiple_v1';
 
+  const loadPersistedSelection = () => {
+    try {
+      const raw = localStorage.getItem(LS_KEY_BAJA_MULTI);
+      if (!raw) return { ids: new Set(), descriptions: new Map() };
+      const saved = JSON.parse(raw);
+      if (!saved || typeof saved !== 'object') return { ids: new Set(), descriptions: new Map() };
+      const ids = Array.isArray(saved.ids) ? new Set(saved.ids.map(String)) : new Set();
+      const descriptions = saved.descriptions && typeof saved.descriptions === 'object'
+        ? new Map(Object.entries(saved.descriptions).map(([k, v]) => [String(k), String(v)]))
+        : new Map();
+      return { ids, descriptions };
+    } catch (e) {
+      return { ids: new Set(), descriptions: new Map() };
+    }
+  };
+
+  const persistSelection = () => {
+    try {
+      const payload = {
+        ids: Array.from(selectedIdSet),
+        descriptions: Object.fromEntries(selectedItemDescriptions)
+      };
+      localStorage.setItem(LS_KEY_BAJA_MULTI, JSON.stringify(payload));
+    } catch (e) {
+      // noop
+    }
+  };
+
+  const selectedPersisted = loadPersistedSelection();
+  const selectedIdSet = selectedPersisted.ids;
+  const selectedItemDescriptions = selectedPersisted.descriptions;
+
+  const syncHiddenInputs = () => {
+    if (hiddenSelectedIdsInput) {
+      hiddenSelectedIdsInput.value = Array.from(selectedIdSet).join(',');
+    }
+    if (hiddenBajaInput) {
+      hiddenBajaInput.value = bajaSelectionMode ? '1' : '';
+    }
+  };
+
+  const saveSelectionState = () => {
+    syncHiddenInputs();
+    persistSelection();
+  };
+
+  const updateSelectionUI = () => {
     document.querySelectorAll('.chk-bien').forEach(chk => {
+      const id = String(chk.value);
+      const selected = selectedIdSet.has(id);
+      chk.checked = selected;
+      if (selected && chk.dataset.descripcion) {
+        selectedItemDescriptions.set(id, chk.dataset.descripcion);
+      }
       const tr = chk.closest('tr');
       if (!tr) return;
-      tr.classList.toggle('seleccionado-baja', chk.checked);
+      tr.classList.toggle('seleccionado-baja', selected);
     });
-
-    if (btnBajaMultiple) {
-      btnBajaMultiple.innerHTML = `<i class="fas fa-level-down-alt me-1"></i> Baja múltiple`;
-    }
 
     if (selectAll) {
       const all = Array.from(document.querySelectorAll('.chk-bien'));
       selectAll.checked = all.length > 0 && all.every(chk => chk.checked);
     }
+
+    saveSelectionState();
     updateBajaPanel();
   };
 
@@ -511,14 +557,14 @@
     if (hiddenBajaInput) {
       hiddenBajaInput.value = active ? '1' : '';
     }
-    if (!active && hiddenSelectedIdsInput) {
-      hiddenSelectedIdsInput.value = '';
-    }
     const tableContainer = document.querySelector('.table-responsive');
     if (tableContainer) {
       tableContainer.classList.toggle('tabla-selection-mode', active);
     }
     if (!active) {
+      selectedIdSet.clear();
+      selectedItemDescriptions.clear();
+      saveSelectionState();
       document.querySelectorAll('.chk-bien').forEach(chk => {
         chk.checked = false;
         const tr = chk.closest('tr');
@@ -534,12 +580,32 @@
 
   if (selectAll) {
     selectAll.addEventListener('change', () => {
-      document.querySelectorAll('.chk-bien').forEach(c => c.checked = selectAll.checked);
+      document.querySelectorAll('.chk-bien').forEach(chk => {
+        const id = String(chk.value);
+        if (selectAll.checked) {
+          selectedIdSet.add(id);
+          if (chk.dataset.descripcion) selectedItemDescriptions.set(id, chk.dataset.descripcion);
+        } else {
+          selectedIdSet.delete(id);
+          selectedItemDescriptions.delete(id);
+        }
+      });
       updateSelectionUI();
     });
   }
+
   document.addEventListener('change', e => {
-    if (e.target.classList && e.target.classList.contains('chk-bien')) updateSelectionUI();
+    if (e.target.classList && e.target.classList.contains('chk-bien')) {
+      const id = String(e.target.value);
+      if (e.target.checked) {
+        selectedIdSet.add(id);
+        if (e.target.dataset.descripcion) selectedItemDescriptions.set(id, e.target.dataset.descripcion);
+      } else {
+        selectedIdSet.delete(id);
+        selectedItemDescriptions.delete(id);
+      }
+      updateSelectionUI();
+    }
   });
 
   const toggleRowSelection = (event) => {
@@ -550,7 +616,16 @@
 
     const checkbox = row.querySelector('.chk-bien');
     if (!checkbox) return;
-    checkbox.checked = !checkbox.checked;
+    const nextChecked = !checkbox.checked;
+    checkbox.checked = nextChecked;
+    const id = String(checkbox.value);
+    if (nextChecked) {
+      selectedIdSet.add(id);
+      if (checkbox.dataset.descripcion) selectedItemDescriptions.set(id, checkbox.dataset.descripcion);
+    } else {
+      selectedIdSet.delete(id);
+      selectedItemDescriptions.delete(id);
+    }
     updateSelectionUI();
   };
 
@@ -560,9 +635,7 @@
 
   if (btnBajaMultiple) {
     btnBajaMultiple.addEventListener('click', function() {
-      if (!bajaSelectionMode) {
-        setBajaSelectionMode(true);
-      }
+      setBajaSelectionMode(!bajaSelectionMode);
     });
   }
 
@@ -572,24 +645,36 @@
     });
   }
 
+  const filtrosForm = document.querySelector('#filtros-form');
+  if (filtrosForm) {
+    filtrosForm.addEventListener('submit', saveSelectionState);
+  }
+
   const restoreSelectedRows = () => {
-    if (!hiddenSelectedIdsInput || !hiddenSelectedIdsInput.value) return;
-    const ids = hiddenSelectedIdsInput.value.split(',').map(id => id.trim()).filter(Boolean);
+    let ids = [];
+    if (hiddenSelectedIdsInput && hiddenSelectedIdsInput.value) {
+      ids = hiddenSelectedIdsInput.value.split(',').map(id => id.trim()).filter(Boolean);
+    } else {
+      ids = Array.from(selectedIdSet);
+    }
     if (!ids.length) return;
     ids.forEach(id => {
+      selectedIdSet.add(id);
       const checkbox = document.querySelector(`.chk-bien[value="${id}"]`);
       if (checkbox) {
         checkbox.checked = true;
+        if (checkbox.dataset.descripcion) selectedItemDescriptions.set(id, checkbox.dataset.descripcion);
         const tr = checkbox.closest('tr');
         if (tr) tr.classList.add('seleccionado-baja');
       }
     });
+    saveSelectionState();
     updateSelectionUI();
   };
 
   // Restaurar modo baja múltiple si viene desde la URL o si hay IDs seleccionados guardados
   const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('baja_multiple') === '1' || (hiddenSelectedIdsInput && hiddenSelectedIdsInput.value)) {
+  if (urlParams.get('baja_multiple') === '1' || selectedIdSet.size > 0 || (hiddenSelectedIdsInput && hiddenSelectedIdsInput.value)) {
     setBajaSelectionMode(true);
     restoreSelectedRows();
   }
@@ -672,6 +757,9 @@
     formDarBaja.addEventListener('submit', function() {
       if (formDarBaja.checkValidity()) {
         setBajaSelectionMode(false);
+        if (hiddenSelectedIdsInput) {
+          hiddenSelectedIdsInput.value = '';
+        }
       }
     });
   }

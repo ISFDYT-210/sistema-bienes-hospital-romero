@@ -1281,6 +1281,8 @@ def _filtrar_bienes(request, base_qs):
         base_qs = base_qs.filter(estado__isnull=True)
     elif f_estado:
         base_qs = base_qs.filter(estado=f_estado)
+    else:
+        base_qs = base_qs.exclude(estado="BAJA")
     if f_desde:
         d = parse_date(f_desde)
         if d:
