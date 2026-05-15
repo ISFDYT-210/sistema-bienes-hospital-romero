@@ -555,25 +555,31 @@
 
     if (btnRestaurarMultiple) {
       btnRestaurarMultiple.addEventListener('click', function() {
+        // If not in selection mode, enable it. If already in selection mode:
+        // - keep it active when there are selected items (don't hide the panel)
+        // - allow disabling only when nothing is selected
         if (!restaurarSelectionMode) {
           restaurarSelectionMode = true;
-          updateModeUI();
-          return;
+        } else {
+          if (bienesParaRestaurar.size > 0) {
+            // keep active and refresh UI
+            updateRestaurarMultipleUI();
+          } else {
+            restaurarSelectionMode = false;
+          }
         }
-
-        if (bienesParaRestaurar.size > 0) {
-          showRestaurarModal();
-          return;
-        }
-
-        restaurarSelectionMode = false;
         updateModeUI();
       });
     }
 
     if (btnCancelarRestaurar) {
       btnCancelarRestaurar.addEventListener('click', function() {
+        // Clear selection state and persisted storage then restore UI to normal
         restaurarSelectionMode = false;
+        bienesParaRestaurar.clear();
+        try { localStorage.removeItem(LS_KEY); } catch (err) {}
+        if (selectBienesRestaurar) selectBienesRestaurar.innerHTML = '';
+        updateRowSelectionUI();
         updateModeUI();
       });
     }
@@ -671,7 +677,15 @@
     document.body.addEventListener('click', function(e){
       const btn = e.target.closest('.btn-open-confirm');
       if (!btn) return;
-      
+
+      // If restore-multiple mode is active, block individual restore actions
+      if (restaurarSelectionMode) {
+        e.preventDefault();
+        e.stopPropagation();
+        try { alert('Desactivá "Restablecer múltiples bienes" para operar individualmente.'); } catch (err) {}
+        return;
+      }
+
       const action = btn.getAttribute('data-action');
       const title = btn.getAttribute('data-title') || 'Confirmar';
       const message = btn.getAttribute('data-message') || '';
@@ -686,6 +700,18 @@
     document.addEventListener('keydown', function(ev){ if (ev.key === 'Escape' && modal.style.display === 'flex') closeModal(); });
     modal.addEventListener('click', function(ev){ if (ev.target === modal) closeModal(); });
 
+    // Clear persisted restore-selection when navigating to another tab (visibility change)
+    // Do NOT apply on search filter to preserve accumulated selection while filtering
+    window.addEventListener('visibilitychange', function() {
+      if (document.hidden && restaurarSelectionMode) {
+        try { localStorage.removeItem(LS_KEY); } catch (err) {}
+        bienesParaRestaurar.clear();
+        restaurarSelectionMode = false;
+        if (selectBienesRestaurar) selectBienesRestaurar.innerHTML = '';
+        updateRowSelectionUI();
+        updateModeUI();
+      }
+    });
 
   });
 })();

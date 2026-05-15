@@ -635,13 +635,28 @@
 
   if (btnBajaMultiple) {
     btnBajaMultiple.addEventListener('click', function() {
-      setBajaSelectionMode(!bajaSelectionMode);
+      // If not in selection mode, enable it. If already in selection mode:
+      // - keep it active when there are selected items (don't hide the panel)
+      // - allow disabling only when nothing is selected
+      if (!bajaSelectionMode) {
+        setBajaSelectionMode(true);
+      } else {
+        if (selectedIdSet.size > 0) {
+          // keep active and refresh UI (do not close panel)
+          updateBajaPanel();
+        } else {
+          setBajaSelectionMode(false);
+        }
+      }
     });
   }
 
   if (btnCancelarBaja) {
     btnCancelarBaja.addEventListener('click', function() {
+      // Clear selection state and persisted storage then restore UI to normal
       setBajaSelectionMode(false);
+      try { localStorage.removeItem(LS_KEY_BAJA_MULTI); } catch (err) {}
+      if (hiddenSelectedIdsInput) hiddenSelectedIdsInput.value = '';
     });
   }
 
@@ -769,12 +784,37 @@
     formDarBaja.addEventListener('submit', function() {
       if (formDarBaja.checkValidity()) {
         setBajaSelectionMode(false);
+        try { localStorage.removeItem(LS_KEY_BAJA_MULTI); } catch (err) {}
         if (hiddenSelectedIdsInput) {
           hiddenSelectedIdsInput.value = '';
         }
       }
     });
   }
+
+  // When deleting selected items (form-eliminar-bienes), clear selection and persistence
+  const formEliminar = document.getElementById('form-eliminar-bienes');
+  if (formEliminar) {
+    formEliminar.addEventListener('submit', function() {
+      try { localStorage.removeItem(LS_KEY_BAJA_MULTI); } catch (err) {}
+      selectedIdSet.clear();
+      selectedItemDescriptions.clear();
+      setBajaSelectionMode(false);
+      if (hiddenSelectedIdsInput) hiddenSelectedIdsInput.value = '';
+    });
+  }
+
+  // Clear persisted selection when navigating to another tab (visibility change)
+  // Do NOT apply on search filter to preserve accumulated selection while filtering
+  window.addEventListener('visibilitychange', function() {
+    if (document.hidden && bajaSelectionMode) {
+      try { localStorage.removeItem(LS_KEY_BAJA_MULTI); } catch (err) {}
+      selectedIdSet.clear();
+      selectedItemDescriptions.clear();
+      setBajaSelectionMode(false);
+      if (hiddenSelectedIdsInput) hiddenSelectedIdsInput.value = '';
+    }
+  });
 })();
 </script>
 

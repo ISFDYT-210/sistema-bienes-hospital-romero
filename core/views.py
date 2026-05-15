@@ -1281,8 +1281,9 @@ def _filtrar_bienes(request, base_qs):
         base_qs = base_qs.filter(estado__isnull=True)
     elif f_estado:
         base_qs = base_qs.filter(estado=f_estado)
-    else:
-        base_qs = base_qs.exclude(estado="BAJA")
+    # If no specific estado filter is provided, do not exclude BAJA items —
+    # mostrar todas las filas por defecto (incluye BAJA). Esto permite que
+    # al dar de baja un bien siga apareciendo en la lista principal.
     if f_desde:
         d = parse_date(f_desde)
         if d:
