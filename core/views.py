@@ -1438,6 +1438,9 @@ def _filtrar_bienes(request, base_qs):
         base_qs = base_qs.filter(estado__isnull=True)
     elif f_estado:
         base_qs = base_qs.filter(estado=f_estado)
+    # If no specific estado filter is provided, do not exclude BAJA items —
+    # mostrar todas las filas por defecto (incluye BAJA). Esto permite que
+    # al dar de baja un bien siga apareciendo en la lista principal.
     if f_desde:
         d = parse_date(f_desde)
         if d:
@@ -1470,15 +1473,14 @@ def lista_bienes(request):
     perms = permisos_context(request.user)
     if not perms["es_admin"] and not perms["es_supervisor"]:
         return redirect("lista_bienes_operador")
- 
-    qs = BienPatrimonial.objects.select_related("expediente")
+    qs = BienPatrimonial.objects.select_related("expediente").exclude(estado="BAJA")
     qs, q = _filtrar_bienes(request, qs)
     return _paginar_bienes(request, qs, "bienes/lista_bienes.html", {"q": q})
  
  
 @login_required
 def lista_bienes_operador(request):
-    qs = BienPatrimonial.objects.select_related("expediente")
+    qs = BienPatrimonial.objects.select_related("expediente").exclude(estado="BAJA")
     qs, q = _filtrar_bienes(request, qs)
     return _paginar_bienes(request, qs, "bienes/lista_bienes_operador.html", {"q": q})
  
@@ -1489,8 +1491,7 @@ def lista_bienes_supervisor(request):
     if not (request.user.is_superuser or tipo in ("admin", "supervisor")):
         messages.error(request, "No tenés permisos para acceder a esta sección.")
         return redirect("home_operador")
- 
-    qs = BienPatrimonial.objects.select_related("expediente")
+    qs = BienPatrimonial.objects.select_related("expediente").exclude(estado="BAJA")
     qs, q = _filtrar_bienes(request, qs)
     return _paginar_bienes(request, qs, "bienes/lista_bienes_supervisor.html", {
         "q": q,
@@ -2038,10 +2039,17 @@ def lista_baja_bienes(request):
 @require_POST
 def dar_baja_bien(request, pk):
     bien = get_object_or_404(BienPatrimonial, pk=pk)
+    print("DAR BAJA POST:", dict(request.POST))
     fecha_baja = parse_date(request.POST.get("fecha_baja") or "") or date.today()
-    expediente_baja = (request.POST.get("expediente_baja") or "").strip()
-    descripcion_baja = (request.POST.get("descripcion_baja") or "").strip()
- 
+    expediente_baja = (
+        request.POST.get(f"expediente_baja_{pk}")
+        or request.POST.get("expediente_baja")
+        or "").strip()
+    descripcion_baja = (
+        request.POST.get(f"descripcion_baja_{pk}")
+        or request.POST.get("descripcion_baja")
+        or ""
+    ).strip()
     bien.estado = "BAJA"
     update_fields = ["estado"]
     if hasattr(bien, "fecha_baja"):
@@ -2054,7 +2062,7 @@ def dar_baja_bien(request, pk):
         bien.descripcion_baja = descripcion_baja
         update_fields.append("descripcion_baja")
     bien.save(update_fields=update_fields)
- 
+    print("GUARDADO:", bien.pk, bien.estado, bien.fecha_baja, bien.expediente_baja, bien.descripcion_baja)
     nombre_bien = getattr(bien, "nombre", None) or getattr(bien, "descripcion", "Sin nombre")
     msg_baja = f"Se dio de baja el bien '{nombre_bien}' (Clave: {bien.clave_unica})."
     crear_notificacion_admins(msg_baja)
