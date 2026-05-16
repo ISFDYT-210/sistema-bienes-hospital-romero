@@ -1014,9 +1014,10 @@ def registro_pdf(request):
  
         page_w, _ = A4
         usable_w = page_w - (doc.leftMargin + doc.rightMargin)
-        col_fecha = 3.2 * cm
-        col_usuario = 3.2 * cm
-        col_mensaje = usable_w - col_fecha - col_usuario
+        col_fecha = 3.3 * cm
+        col_usuario = 2.5 * cm
+        col_accion = 3.2 * cm
+        col_mensaje = usable_w - col_fecha - col_usuario - col_accion
  
         data = [[P("Fecha", True), P("Usuario", True), P("Acción", True), P("Mensaje", True)]]
         for l in logs:
@@ -1027,7 +1028,7 @@ def registro_pdf(request):
                 P(l.mensaje),
             ])
  
-        table = Table(data, repeatRows=1, colWidths=[col_fecha, col_usuario, col_mensaje])
+        table = Table(data, repeatRows=1, colWidths=[col_fecha, col_usuario, col_accion, col_mensaje])
         ts = TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f2f2f2")),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
