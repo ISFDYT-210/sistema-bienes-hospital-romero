@@ -183,11 +183,16 @@
     <div class="col ms-auto d-flex align-items-end justify-content-end gap-2">
       {% if es_admin %}
       <button type="button" id="btn-abrir-baja-multiple"
-              class="btn btn-warning text-dark"
+              class="btn btn-warning text-dark d-inline-flex align-items-center justify-content-center"
+              style="height: 38px; font-weight: 700; font-size: 14px; border-radius: 6px; padding: 0 16px; border: none;"
               title="Seleccionar bienes para dar de baja">
-        <i class="fas fa-level-down-alt me-1"></i> Baja múltiple
+        <i class="fas fa-level-down-alt me-2"></i> Baja múltiple
       </button>
       {% endif %}
+
+      <a class="btn-inst-nav" href="{% url 'lista_baja_bienes' %}" title="Ver bienes dados de baja">
+        <i class="fa-solid fa-trash me-2"></i> Lista de bajas
+      </a>
 
       {% if not es_supervisor %}
       <button type="submit" id="btn-confirm-eliminar"
@@ -195,10 +200,6 @@
               class="btn btn-danger d-none" disabled>
         <i class="fas fa-trash me-1"></i> Eliminar (0)
       </button>
-
-      <a class="btn-inst-nav btn-inst-nav--danger" href="{% url 'lista_baja_bienes' %}" title="Ver bienes dados de baja">
-        <i class="fa-solid fa-trash me-1"></i> Lista de bajas
-      </a>
       {% endif %}
     </div>
 
@@ -339,7 +340,7 @@
             <td class="text-nowrap">{{ b.servicios|default:"—" }}</td>
             <td style="min-width:220px;">{{ b.observaciones|default:"—" }}</td>
             <td class="text-nowrap">
-              {% if b.siem %}{{ b.siem|date:"d/m/Y" }}{% else %}—{% endif %}
+              {{ b.siem|default:"—" }}
             </td>
             <td class="text-end">
               {% if b.valor_adquisicion %}
@@ -545,9 +546,10 @@
       tr.classList.toggle('seleccionado-baja', selected);
     });
 
-    if (selectAll) {
+    const currentSelectAll = document.getElementById('select-all');
+    if (currentSelectAll) {
       const all = Array.from(document.querySelectorAll('.chk-bien'));
-      selectAll.checked = all.length > 0 && all.every(chk => chk.checked);
+      currentSelectAll.checked = all.length > 0 && all.every(chk => chk.checked);
     }
 
     saveSelectionState();
@@ -572,7 +574,8 @@
         const tr = chk.closest('tr');
         if (tr) tr.classList.remove('seleccionado-baja');
       });
-      if (selectAll) selectAll.checked = false;
+      const currentSelectAll = document.getElementById('select-all');
+      if (currentSelectAll) currentSelectAll.checked = false;
     }
     document.querySelectorAll('#tabla-bienes tbody tr').forEach(tr => tr.classList.toggle('selectable-row', active));
     updateSelectionUI();
@@ -580,11 +583,13 @@
 
   const tableBody = document.querySelector('#tabla-bienes tbody');
 
-  if (selectAll) {
-    selectAll.addEventListener('change', () => {
+  // Delegación para Select All
+  document.addEventListener('change', e => {
+    if (e.target.id === 'select-all') {
+      const isChecked = e.target.checked;
       document.querySelectorAll('.chk-bien').forEach(chk => {
         const id = String(chk.value);
-        if (selectAll.checked) {
+        if (isChecked) {
           selectedIdSet.add(id);
           if (chk.dataset.descripcion) selectedItemDescriptions.set(id, chk.dataset.descripcion);
         } else {
@@ -593,8 +598,8 @@
         }
       });
       updateSelectionUI();
-    });
-  }
+    }
+  });
 
   document.addEventListener('change', e => {
     if (e.target.classList && e.target.classList.contains('chk-bien')) {
@@ -631,9 +636,17 @@
     updateSelectionUI();
   };
 
-  if (tableBody) {
-    tableBody.addEventListener('click', toggleRowSelection);
-  }
+  document.addEventListener('click', toggleRowSelection);
+
+  // Función global para refrescar tras AJAX
+  window.refreshBajaSelection = () => {
+    if (bajaSelectionMode) {
+      const tableContainer = document.querySelector('.table-responsive');
+      if (tableContainer) tableContainer.classList.add('tabla-selection-mode');
+      document.querySelectorAll('#tabla-bienes tbody tr').forEach(tr => tr.classList.add('selectable-row'));
+      restoreSelectedRows();
+    }
+  };
 
   if (btnBajaMultiple) {
     btnBajaMultiple.addEventListener('click', function() {
@@ -924,7 +937,8 @@ document.addEventListener('click', function(e) {
       window.history.pushState({}, '', url);
       
       // Re-inicializar comportamientos si es necesario
-      // En este caso, la mayoría de los botones de acciones usan delegación en el script de arriba
+      if (window.refreshBajaSelection) window.refreshBajaSelection();
+      if (window.initFloatingScrollbar) window.initFloatingScrollbar();
     })
     .catch(err => {
       console.error('Error en fetch:', err);

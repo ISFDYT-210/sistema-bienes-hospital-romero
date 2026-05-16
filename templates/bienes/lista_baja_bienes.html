@@ -127,11 +127,6 @@
 <div class="container-fluid py-3">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h3 class="m-0">Bienes — Dados de Baja</h3>
-    <div class="d-flex gap-2">
-      <a class="btn-inst-nav" href="{% url 'lista_bienes' %}">
-        <i class="fas fa-arrow-left"></i> Volver a lista de bienes
-      </a>
-    </div>
   </div>
 
   <!-- BÚSQUEDA / ORDEN -->
@@ -161,11 +156,21 @@
       <a class="btn-inst-clear" href="{% url 'lista_baja_bienes' %}">
         <i class="fas fa-times"></i> Limpiar
       </a>
+    </div>
+
+    <!-- CONTROLES DERECHA -->
+    <div class="col ms-auto d-flex align-items-end justify-content-end gap-2">
       {% if es_admin %}
-      <button class="btn btn-success" type="button" id="btn-top-restaurar-multiple">
-        <i class="fas fa-undo me-1"></i> Restablecer múltiples bienes
+      <button class="btn btn-success d-inline-flex align-items-center justify-content-center" 
+              style="height: 38px; font-weight: 700; font-size: 14px; border-radius: 6px; padding: 0 16px; border: none;"
+              type="button" id="btn-top-restaurar-multiple">
+        <i class="fas fa-undo me-2"></i> Restablecer múltiples bienes
       </button>
       {% endif %}
+
+      <a class="btn-inst-nav" href="{% url 'lista_bienes' %}">
+        <i class="fas fa-arrow-left me-2"></i> Volver a lista de bienes
+      </a>
     </div>
 
     <div class="col-12 collapse mt-3" id="filtrosBox">
@@ -222,9 +227,11 @@
     <table class="table table-sm table-bordered align-middle">
       <thead class="table-light text-center">
         <tr>
+          {% if not es_supervisor %}
           <th class="seleccion-col d-none" style="width:36px;">
             <input type="checkbox" id="select-all-restaurar" class="form-check-input">
           </th>
+          {% endif %}
           <th>Clave Única</th>
           <th>N° de ID</th>
           <th>Descripción</th>
@@ -244,15 +251,19 @@
           <th>Precio</th>
           <th>Fecha de Alta</th>
           <th>Fecha de Baja</th>
+          {% if not es_supervisor %}
           <th class="text-nowrap">Acciones</th>
+          {% endif %}
         </tr>
       </thead>
       <tbody>
         {% for b in bienes %}
         <tr>
+          {% if not es_supervisor %}
           <td class="text-center seleccion-col d-none">
             <input type="checkbox" class="form-check-input chk-restaurar" data-pk="{{ b.pk }}" data-descripcion="{{ b.descripcion|escapejs }}">
           </td>
+          {% endif %}
           <td class="text-nowrap">{{ b.clave_unica }}</td>
           <td class="text-nowrap">{{ b.numero_identificacion|default:"—" }}</td>
           <td style="min-width:260px;">{{ b.descripcion }}</td>
@@ -310,7 +321,7 @@
           <td class="text-nowrap">{{ b.servicios|default:"—" }}</td>
 
           <td style="min-width:220px;">{{ b.observaciones|default:"—" }}</td>
-          <td class="text-nowrap">{% if b.siem %}{{ b.siem|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+          <td class="text-nowrap">{{ b.siem|default:"—" }}</td>
           <td style="min-width:220px;">{{ b.descripcion_baja|default:"—" }}</td>
 
           <td class="text-end">
@@ -327,6 +338,7 @@
             {% if b.fecha_baja %}{{ b.fecha_baja|date:"d/m/Y" }}{% else %}—{% endif %}
           </td>
 
+          {% if not es_supervisor %}
           <td class="text-center text-nowrap">
             <!-- Botones ahora abren modal de confirmación centralizado -->
             <button type="button" class="btn btn-sm btn-success btn-open-confirm btn-toggle-restaurar" title="Restablecer a ACTIVO"
@@ -337,6 +349,7 @@
               <i class="fas fa-undo"></i>
             </button>
           </td>
+          {% endif %}
         </tr>
         {% empty %}
         <tr>
