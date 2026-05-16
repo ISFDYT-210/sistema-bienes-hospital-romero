@@ -1317,14 +1317,14 @@ def lista_bienes(request):
     if not perms["es_admin"] and not perms["es_supervisor"]:
         return redirect("lista_bienes_operador")
 
-    qs = BienPatrimonial.objects.select_related("expediente")
+    qs = BienPatrimonial.objects.select_related("expediente").exclude(estado="BAJA")
     qs, q = _filtrar_bienes(request, qs)
     return _paginar_bienes(request, qs, "bienes/lista_bienes.html", {"q": q})
 
 
 @login_required
 def lista_bienes_operador(request):
-    qs = BienPatrimonial.objects.select_related("expediente")
+    qs = BienPatrimonial.objects.select_related("expediente").exclude(estado="BAJA")
     qs, q = _filtrar_bienes(request, qs)
     return _paginar_bienes(request, qs, "bienes/lista_bienes_operador.html", {"q": q})
 
@@ -1336,7 +1336,7 @@ def lista_bienes_supervisor(request):
         messages.error(request, "No tenés permisos para acceder a esta sección.")
         return redirect("home_operador")
 
-    qs = BienPatrimonial.objects.select_related("expediente")
+    qs = BienPatrimonial.objects.select_related("expediente").exclude(estado="BAJA")
     qs, q = _filtrar_bienes(request, qs)
     return _paginar_bienes(request, qs, "bienes/lista_bienes_supervisor.html", {
         "q": q,
@@ -1875,9 +1875,17 @@ def lista_baja_bienes(request):
 @require_POST
 def dar_baja_bien(request, pk):
     bien = get_object_or_404(BienPatrimonial, pk=pk)
+    print("DAR BAJA POST:", dict(request.POST))
     fecha_baja = parse_date(request.POST.get("fecha_baja") or "") or date.today()
-    expediente_baja = (request.POST.get("expediente_baja") or "").strip()
-    descripcion_baja = (request.POST.get("descripcion_baja") or "").strip()
+    expediente_baja = (
+    request.POST.get(f"expediente_baja_{pk}")
+    or request.POST.get("expediente_baja")
+    or "").strip()
+    descripcion_baja = (
+    request.POST.get(f"descripcion_baja_{pk}")
+    or request.POST.get("descripcion_baja")
+    or ""
+    ).strip()
 
     bien.estado = "BAJA"
     update_fields = ["estado"]
@@ -1891,6 +1899,7 @@ def dar_baja_bien(request, pk):
         bien.descripcion_baja = descripcion_baja
         update_fields.append("descripcion_baja")
     bien.save(update_fields=update_fields)
+    print("GUARDADO:", bien.pk, bien.estado, bien.fecha_baja, bien.expediente_baja, bien.descripcion_baja) 
 
     nombre_bien = getattr(bien, "nombre", None) or getattr(bien, "descripcion", "Sin nombre")
     crear_notificacion_admins(

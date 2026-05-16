@@ -197,7 +197,7 @@
       </button>
 
       <a class="btn-inst-nav" href="{% url 'lista_baja_bienes' %}" title="Ver bienes dados de baja">
-        <i class="fa-solid fa-trash"></i>
+        <i class="fa-solid fa-trash me-1"></i> Lista de bajas
       </a>
       {% endif %}
     </div>
@@ -708,34 +708,25 @@
       }
     });
   }
-
-  document.addEventListener('click', function(e) {
-    const btn = e.target.closest('.btn-dar-baja');
-    if (!btn) return;
-
-    // If multi-selection mode is active, block individual dar-baja
-    if (bajaSelectionMode) {
-      e.preventDefault();
-      e.stopPropagation();
-      try {
-        alert('Desactivá Baja múltiple para dar de baja individual.');
-      } catch (err) {
-        // noop
-      }
-      return;
-    }
-
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.btn-dar-baja');
+  if (!btn) return;
+  if (bajaSelectionMode) {
     e.preventDefault();
-    const form = document.getElementById('form-dar-baja');
-    if (form) form.action = btn.getAttribute('data-action') || '';
-
-    buildBajaTable([[btn.getAttribute('data-pk'), btn.getAttribute('data-descripcion') || '']]);
-    const offcanvasEl = document.getElementById('offcanvasDarBaja');
-    if (offcanvasEl) {
-      const offcanvas = bootstrap.Offcanvas.getOrCreateInstance(offcanvasEl);
-      offcanvas.show();
-    }
-  });
+    e.stopPropagation();
+    alert('Desactivá Baja múltiple para dar de baja individual.');
+    return;
+  }
+  e.preventDefault();
+  const form = document.getElementById('form-dar-baja');
+  if (form) form.action = btn.getAttribute('data-action') || '';
+  buildBajaTable([[btn.getAttribute('data-pk'), btn.getAttribute('data-descripcion') || '']]);
+  const offcanvasEl = document.getElementById('offcanvasDarBaja');
+  if (offcanvasEl) {
+    const offcanvas = bootstrap.Offcanvas.getOrCreateInstance(offcanvasEl);
+    offcanvas.show();
+  }
+});
 
   function buildBajaTable(items) {
     const container = document.getElementById('tabla-bienes-baja');
@@ -869,26 +860,21 @@
       if (submitBtn) submitBtn.focus();
     });
 
-    // Modificar el submit del form para abrir el offcanvas en lugar de eliminar directamente
-    form.addEventListener('submit', function(e){
-      e.preventDefault();
-      const pk = form.getAttribute('data-pk');
-      const nombre = form.getAttribute('data-nombre');
-      const action = form.getAttribute('action');
-      
-      modal.style.display = 'none';
-      
-      const formDarBaja = document.getElementById('form-dar-baja');
-      if (formDarBaja) formDarBaja.action = action;
-      
-      buildBajaTable([[pk, nombre]]);
-      const offcanvasEl = document.getElementById('offcanvasDarBaja');
-      if (offcanvasEl) {
-        const offcanvas = bootstrap.Offcanvas.getOrCreateInstance(offcanvasEl);
-        offcanvas.show();
-      }
-    });
-
+   form.addEventListener('submit', function(e){
+  e.preventDefault();
+  const pk = form.getAttribute('data-pk');
+  const nombre = form.getAttribute('data-nombre');
+  const action = form.getAttribute('action');
+  modal.style.display = 'none';
+  const formDarBaja = document.getElementById('form-dar-baja');
+  if (formDarBaja) formDarBaja.action = action;
+  buildBajaTable([[pk, nombre]]);
+  const offcanvasEl = document.getElementById('offcanvasDarBaja');
+  if (offcanvasEl) {
+    const offcanvas = bootstrap.Offcanvas.getOrCreateInstance(offcanvasEl);
+    offcanvas.show();
+  }
+});
     btnCancel.addEventListener('click', function(){
       modal.style.display = 'none';
     });
