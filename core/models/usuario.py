@@ -19,9 +19,8 @@ class Usuario(AbstractUser):
 
     numero_doc = models.CharField(
         max_length=50,
-        blank=True,
-        null=True,
-        unique=True,
+        primary_key=True,
+        serialize=False,
         verbose_name='Número de Documento'
     )
 
