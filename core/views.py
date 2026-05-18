@@ -371,14 +371,6 @@ def alta_operadores(request):
         messages.error(request, "No tienes permisos para acceder a esta página")
         return redirect("home_operador")
     if request.method == "POST":
-        nombre = " ".join((request.POST.get("nombre") or "").strip().split())
-        apellido = " ".join((request.POST.get("apellido") or "").strip().split())
-        pais = (request.POST.get("pais") or "").strip()
-        dni = (request.POST.get("dni") or "").strip()
-        email = (request.POST.get("email") or "").strip()
-        estado = (request.POST.get("estado") or "habilitado").strip()
-        password = (request.POST.get("password") or "").strip()
- 
         form = OperadorForm(request.POST)
         if not form.is_valid():
             return render(
@@ -386,7 +378,15 @@ def alta_operadores(request):
                 "alta_operadores.html",
                 {"usar_operador_model": False, "form": form},
             )
- 
+
+        nombre = " ".join((form.cleaned_data.get("nombre") or "").strip().split())
+        apellido = " ".join((form.cleaned_data.get("apellido") or "").strip().split())
+        pais = (form.cleaned_data.get("pais") or "Argentina").strip()
+        numero_doc = (form.cleaned_data.get("dni") or "").strip()
+        email = (form.cleaned_data.get("email") or "").strip() or None
+        estado = (form.cleaned_data.get("estado") or "habilitado").strip()
+        password = (form.cleaned_data.get("password") or "").strip()
+
         if not nombre or not apellido:
             messages.error(request, "Debés completar nombre y apellido.")
             return render(
@@ -394,22 +394,7 @@ def alta_operadores(request):
                 "alta_operadores.html",
                 {"usar_operador_model": False, "form": form},
             )
- 
-        numero_doc = form.cleaned_data["dni"]
- 
-        nombre     = (request.POST.get("nombre") or "").strip()
-        apellido   = (request.POST.get("apellido") or "").strip()
-        pais       = (request.POST.get("pais") or "").strip()
-        numero_doc = (request.POST.get("numero_doc") or "").strip()
-        email      = (request.POST.get("email") or "").strip()
-        estado     = (request.POST.get("estado") or "habilitado").strip()
-        password   = (request.POST.get("password") or "").strip()
- 
-        # Validación DNI duplicado
-        if numero_doc and Usuario.objects.filter(numero_doc=numero_doc).exists():
-            messages.error(request, f"Ya existe un operador con el DNI {numero_doc}.")
-            return redirect("alta_operadores")
- 
+
         base_username = slugify(f"{nombre}.{apellido}") or (email.split("@")[0] if email else "")
         if not base_username:
             messages.error(request, "No se pudo generar un usuario. Completá Nombre/Apellido o Email.")
@@ -418,18 +403,18 @@ def alta_operadores(request):
                 "alta_operadores.html",
                 {"usar_operador_model": False, "form": form},
             )
- 
+
         username = base_username
         i = 1
         while Operador.objects.filter(username=username).exists():
             i += 1
             username = f"{base_username}{i}"
- 
+
         is_active = estado == "habilitado"
- 
+
         operador = Operador(
             username=username,
-            email=email or None,
+            email=email,
             first_name=nombre,
             last_name=apellido,
             is_staff=False,
@@ -443,14 +428,14 @@ def alta_operadores(request):
             operador.set_password(password)
         else:
             operador.set_password(username)
- 
+
         if hasattr(operador, "pais"):
             operador.pais = pais
         if hasattr(operador, "numero_doc"):
             operador.numero_doc = numero_doc
         if hasattr(operador, "estado"):
             operador.estado = estado
- 
+
         saved = False
         attempts = 0
         while not saved and attempts < 10:
@@ -462,7 +447,7 @@ def alta_operadores(request):
                 i += 1
                 username = f"{base_username}{i}"
                 operador.username = username
- 
+
         if not saved:
             messages.error(
                 request,
@@ -473,16 +458,16 @@ def alta_operadores(request):
                 "alta_operadores.html",
                 {"usar_operador_model": False, "form": form},
             )
- 
+
         Notificacion.objects.create(
             usuario=request.user,
             mensaje=f"Se creó el operador '{operador.username}'.",
             leida=False,
         )
- 
+
         messages.success(request, f"Operador {nombre} {apellido} creado. Usuario: {operador.username}")
         return redirect("operadores")
- 
+
     form = OperadorForm(initial={
         'nombre': '',
         'apellido': '',
@@ -496,35 +481,33 @@ def alta_operadores(request):
     ctx = permisos_context(request.user)
     ctx.update({"usar_operador_model": False, "form": form})
     return render(request, "alta_operadores.html", ctx)
- 
+
 @login_required
 def editar_operador(request, pk):
     operador = get_object_or_404(Operador, pk=pk, is_staff=False)
- 
+
     if request.method == "POST":
-        nombre = " ".join((request.POST.get("nombre") or "").strip().split())
-        apellido = " ".join((request.POST.get("apellido") or "").strip().split())
-        email = (request.POST.get("email") or "").strip()
-        estado = (request.POST.get("estado") or "habilitado").strip()
-        pais = (request.POST.get("pais") or "").strip()
-        dni = (request.POST.get("dni") or "").strip()
-        tipo_usuario = (request.POST.get("tipo_usuario") or "empleado").strip()
-        password = (request.POST.get("password") or "").strip()
- 
         form = OperadorForm(request.POST, operador_pk=operador.pk)
         if not form.is_valid():
             ctx = permisos_context(request.user)
             ctx.update({"operador": operador, "usar_operador_model": False, "form": form})
             return render(request, "editar_operadores.html", ctx)
- 
-        numero_doc = form.cleaned_data["dni"]
- 
+
+        nombre = " ".join((form.cleaned_data.get("nombre") or "").strip().split())
+        apellido = " ".join((form.cleaned_data.get("apellido") or "").strip().split())
+        email = (form.cleaned_data.get("email") or "").strip() or None
+        estado = (form.cleaned_data.get("estado") or "habilitado").strip()
+        pais = (form.cleaned_data.get("pais") or "").strip()
+        numero_doc = (form.cleaned_data.get("dni") or "").strip()
+        tipo_usuario = (form.cleaned_data.get("tipo_usuario") or "operador").strip()
+        password = (form.cleaned_data.get("password") or "").strip()
+
         if not nombre or not apellido:
             messages.error(request, "Debés completar nombre y apellido.")
             ctx = permisos_context(request.user)
             ctx.update({"operador": operador, "usar_operador_model": False, "form": form})
             return render(request, "editar_operadores.html", ctx)
- 
+
         hubo_cambio = False
  
         if operador.first_name != nombre:
