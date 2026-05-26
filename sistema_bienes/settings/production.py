@@ -27,7 +27,7 @@ else:
         }
     }
 
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.smtp.EmailBackend')
 
 HOSPITAL_NAME = config(
     'HOSPITAL_NAME',

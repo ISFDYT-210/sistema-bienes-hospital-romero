@@ -7,6 +7,7 @@ from django.core.validators import RegexValidator
 from django.contrib.auth import get_user_model
 from core.models import BienPatrimonial
 from core.models.expediente import Expediente
+from core.constants import ORIGENES_COMPRA
 from datetime import date
 
 
@@ -226,8 +227,8 @@ class BienPatrimonialForm(forms.ModelForm):
             self.add_error("numero_expediente", "Si informás N° de compra, debés indicar el N° de Expediente.")
 
 
-        # Precio: si el origen no es COMPRA, ignorar precio
-        if cleaned.get("origen") and cleaned["origen"] != "COMPRA":
+        # Precio: si el origen no es COMPRA ni COMPRA_MENOR, ignorar precio
+        if cleaned.get("origen") and cleaned["origen"] not in ORIGENES_COMPRA:
             cleaned["valor_adquisicion"] = None
 
         estado = cleaned.get("estado")
@@ -315,6 +316,14 @@ class OperadorForm(forms.Form):
 
     def clean_email(self):
         email = (self.cleaned_data.get('email') or '').strip()
+        if not email:
+            return email
+        Operador = get_user_model()
+        operadores = Operador.objects.filter(email__iexact=email)
+        if self.operador_pk:
+            operadores = operadores.exclude(pk=self.operador_pk)
+        if operadores.exists():
+            raise ValidationError('Ya existe un operador con ese email')
         return email
 
     def clean_password(self):
@@ -332,5 +341,11 @@ class OperadorForm(forms.Form):
             raise ValidationError('La contraseña debe incluir al menos un número.')
         if not re.search(r'[^A-Za-z0-9]', password):
             raise ValidationError('La contraseña debe incluir al menos un carácter especial.')
+
+        from django.contrib.auth.password_validation import validate_password
+        try:
+            validate_password(password)
+        except ValidationError as e:
+            raise ValidationError(e.messages)
 
         return password
