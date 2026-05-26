@@ -7,7 +7,7 @@ DEBUG = False
 # Configurar en las variables de entorno de Vercel: ALLOWED_HOSTS=tu-app.vercel.app,www.tu-dominio.com
 ALLOWED_HOSTS = config(
     'ALLOWED_HOSTS',
-    default='localhost,127.0.0.1',
+    default='.vercel.app,localhost,127.0.0.1',
     cast=Csv()
 )
 
@@ -37,3 +37,6 @@ HOSPITAL_NAME = config(
 # Seguridad para producción
 SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = 'DENY'
+
+# Confiar en los orígenes de Vercel para peticiones POST (login, formularios, etc)
+CSRF_TRUSTED_ORIGINS = ['https://*.vercel.app']
