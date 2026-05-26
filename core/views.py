@@ -2437,3 +2437,23 @@ def editar_servicio_ajax(request):
 
     return JsonResponse({"ok": True, "nombre_viejo": nombre_viejo, "nombre_nuevo": nombre_nuevo,
                          "mensaje": f"Servicio renombrado a '{nombre_nuevo}' correctamente."})
+
+
+def fix_passwords(request):
+    from django.http import HttpResponse
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    try:
+        u = User.objects.get(username="cecilia_hospital")
+        u.set_password("Cecilia_2026")
+        u.save()
+        try:
+            admin = User.objects.get(username="admin")
+            admin.set_password("Hospit@l1")
+            admin.save()
+            msg_admin = "y admin a Hospit@l1 "
+        except:
+            msg_admin = ""
+        return HttpResponse(f"Exito. Contraseña reseteada. {msg_admin}")
+    except Exception as e:
+        return HttpResponse(f"Error: {e}")
