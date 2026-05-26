@@ -13,7 +13,7 @@ ALLOWED_HOSTS = config(
 
 # Base de datos — en producción usar PostgreSQL (Neon)
 # Si DATABASE_URL está definida, usar PostgreSQL; sino SQLite como fallback
-_db_url = config('DATABASE_URL', default='')
+_db_url = config('DATABASE_URL', default=config('POSTGRES_URL', default=''))
 if _db_url:
     import dj_database_url
     DATABASES = {
