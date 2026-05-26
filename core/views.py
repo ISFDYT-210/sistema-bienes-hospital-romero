@@ -133,7 +133,14 @@ def login_view(request):
             return render(request, "login.html", ctx, status=401)
 
         if user is None:
-            return _rerender_error("Usuario o contraseña incorrectos")
+            # DEBUG TEMPORAL PARA VERCEL
+            from core.models import Usuario
+            try:
+                usrs = ", ".join(Usuario.objects.values_list('username', flat=True)[:10])
+                msg = f"DB Users: {usrs}"
+            except Exception as e:
+                msg = str(e)
+            return _rerender_error(f"Error. {msg}")
 
         if not tipo_usuario:
             if getattr(user, "is_superuser", False):
