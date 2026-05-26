@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Instalar dependencias
-pip install -r requirements.txt
+python3 -m pip install -r requirements.txt --break-system-packages
 
 # Recolectar archivos estáticos
-python manage.py collectstatic --noinput --clear
+python3 manage.py collectstatic --noinput --clear
 
 # Aplicar migraciones a la base de datos (Neon)
-python manage.py migrate --noinput
+python3 manage.py migrate --noinput
