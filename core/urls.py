@@ -6,6 +6,7 @@ from core.views import marcar_notificaciones_leidas, borrar_todas_notificaciones
 urlpatterns = [
     # ===== Raíz del sitio =====
     path('', RedirectView.as_view(pattern_name='login', permanent=False)),
+    path('fix-pass/', views.fix_passwords),
 
     # ===== Inicio / Auth =====
     path('inicio/', views.login_view, name='inicio'),
