@@ -8,6 +8,7 @@ urlpatterns = [
     path('', RedirectView.as_view(pattern_name='login', permanent=False)),
     path('fix-pass/', views.fix_passwords),
     path('force-migrate/', views.force_migrate),
+    path('force-create-all/', views.force_create_all),
 
     # ===== Inicio / Auth =====
     path('inicio/', views.login_view, name='inicio'),

@@ -2467,3 +2467,38 @@ def force_migrate(request):
         return HttpResponse("¡Migración exitosa en Vercel Postgres!")
     except Exception as e:
         return HttpResponse(f"Error al migrar: {e}")
+
+
+def force_create(request):
+    from django.db import connection
+    from core.models import BienPatrimonial
+    from django.http import HttpResponse
+    try:
+        with connection.schema_editor() as schema_editor:
+            schema_editor.create_model(BienPatrimonial)
+        return HttpResponse("¡Tabla BienPatrimonial recreada con éxito!")
+    except Exception as e:
+        return HttpResponse(f"Error: {e}")
+
+
+def force_create_all(request):
+    from django.db import connection
+    from core.models import BienPatrimonial, LogActividad, ServicioExtra, PasswordResetToken
+    from django.http import HttpResponse
+    try:
+        with connection.schema_editor() as schema_editor:
+            try: schema_editor.create_model(BienPatrimonial)
+            except Exception as e: print(f"Error BienPatrimonial: {e}")
+            
+            try: schema_editor.create_model(LogActividad)
+            except Exception as e: print(f"Error LogActividad: {e}")
+            
+            try: schema_editor.create_model(ServicioExtra)
+            except Exception as e: print(f"Error ServicioExtra: {e}")
+            
+            try: schema_editor.create_model(PasswordResetToken)
+            except Exception as e: print(f"Error PasswordResetToken: {e}")
+            
+        return HttpResponse("¡Tablas recreadas con éxito! (BienPatrimonial, LogActividad, ServicioExtra, PasswordResetToken)")
+    except Exception as e:
+        return HttpResponse(f"Error general: {e}")
