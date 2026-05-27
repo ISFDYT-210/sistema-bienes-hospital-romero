@@ -1,7 +1,8 @@
 from .base import *
 from decouple import config, Csv
 
-DEBUG = False
+# === DEBUG SIEMPRE EN TRUE TEMPORALMENTE PARA VER EL ERROR 500 ===
+DEBUG = True
 
 # En Vercel, ALLOWED_HOSTS debe incluir el dominio .vercel.app
 # Configurar en las variables de entorno de Vercel: ALLOWED_HOSTS=tu-app.vercel.app,www.tu-dominio.com
