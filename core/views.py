@@ -2457,3 +2457,13 @@ def fix_passwords(request):
         return HttpResponse(f"Exito. Contraseña reseteada. {msg_admin}")
     except Exception as e:
         return HttpResponse(f"Error: {e}")
+
+
+def force_migrate(request):
+    from django.core.management import call_command
+    from django.http import HttpResponse
+    try:
+        call_command("migrate", interactive=False)
+        return HttpResponse("¡Migración exitosa en Vercel Postgres!")
+    except Exception as e:
+        return HttpResponse(f"Error al migrar: {e}")
