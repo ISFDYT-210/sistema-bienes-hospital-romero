@@ -2482,23 +2482,19 @@ def force_create(request):
 
 
 def force_create_all(request):
-    from django.db import connection
+    from django.db import connection, transaction
     from core.models import BienPatrimonial, LogActividad, ServicioExtra, PasswordResetToken
     from django.http import HttpResponse
-    try:
-        with connection.schema_editor() as schema_editor:
-            try: schema_editor.create_model(BienPatrimonial)
-            except Exception as e: print(f"Error BienPatrimonial: {e}")
-            
-            try: schema_editor.create_model(LogActividad)
-            except Exception as e: print(f"Error LogActividad: {e}")
-            
-            try: schema_editor.create_model(ServicioExtra)
-            except Exception as e: print(f"Error ServicioExtra: {e}")
-            
-            try: schema_editor.create_model(PasswordResetToken)
-            except Exception as e: print(f"Error PasswordResetToken: {e}")
-            
-        return HttpResponse("¡Tablas recreadas con éxito! (BienPatrimonial, LogActividad, ServicioExtra, PasswordResetToken)")
-    except Exception as e:
-        return HttpResponse(f"Error general: {e}")
+    
+    mensajes = []
+    
+    with connection.schema_editor() as schema_editor:
+        for modelo in [BienPatrimonial, LogActividad, ServicioExtra, PasswordResetToken]:
+            try:
+                with transaction.atomic():
+                    schema_editor.create_model(modelo)
+                mensajes.append(f"{modelo.__name__}: Creado con éxito.")
+            except Exception as e:
+                mensajes.append(f"{modelo.__name__}: Omitido (ya existía o hubo un error).")
+                
+    return HttpResponse("<h3>Resultados de la creación de tablas:</h3><br>" + "<br>".join(mensajes))
