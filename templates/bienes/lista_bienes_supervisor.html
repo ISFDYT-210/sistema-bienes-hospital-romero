@@ -85,7 +85,6 @@
       <thead class="table-light text-center">
         <tr>
           <th>Fecha Alta</th>
-          <th>Clave Única</th>
           <th>Descripción</th>
           <th>Servicios</th>
           <th>Origen</th>
@@ -100,7 +99,6 @@
           <td class="text-nowrap">
             {% if bien.fecha_adquisicion %}{{ bien.fecha_adquisicion|date:"d/m/Y" }}{% else %}<span class="text-muted">—</span>{% endif %}
           </td>
-          <td class="text-nowrap"><code class="text-primary">{{ bien.clave_unica|default:"—" }}</code></td>
           <td style="min-width:260px;">
             <div class="fw-semibold">{{ bien.descripcion|default:"—"|truncatechars:60 }}</div>
             {% if bien.numero_serie %}<small class="text-muted">Serie: {{ bien.numero_serie }}</small>{% endif %}

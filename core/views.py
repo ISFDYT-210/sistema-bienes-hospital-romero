@@ -217,7 +217,7 @@ def bienes(request):
         if form.is_valid():
             bien = form.save()
             nombre_bien = getattr(bien, "nombre", None) or getattr(bien, "descripcion", "Sin nombre")
-            msg_carga = f"Se registró el bien '{nombre_bien}' (Clave: {bien.clave_unica}) correctamente."
+            msg_carga = f"Se registró el bien '{nombre_bien}' correctamente."
             crear_notificacion_admins(msg_carga)
             registrar_log(request.user, 'CARGA', msg_carga, bien)
             
@@ -885,8 +885,8 @@ def reportes_pdf(request):
         elems.append(Spacer(1, 8))
  
         data = [[
-            P("Clave", True), P("Descripción", True), P("Servicios", True),
-            P("Estado", True), P("Alta", True), P("Baja", True), P("Valor", True),
+            P("Descripción", True), P("N° de ID", True), P("N° de Serie", True),
+            P("Servicios", True), P("Estado", True), P("Fecha Alta", True), P("Fecha Baja", True), P("Valor", True),
         ]]
 
         for b in bienes:
@@ -894,8 +894,9 @@ def reportes_pdf(request):
             alta = b.fecha_adquisicion.strftime("%d/%m/%Y") if b.fecha_adquisicion else "—"
             baja = b.fecha_baja.strftime("%d/%m/%Y") if b.fecha_baja else "—"
             data.append([
-                P(b.clave_unica or "—"),
                 P(b.descripcion or "—"),
+                P(b.numero_identificacion or "—"),
+                P(b.numero_serie or "—"),
                 P(b.servicios or "—"),
                 P(estado),
                 P(alta),
@@ -905,7 +906,7 @@ def reportes_pdf(request):
 
         page_w, _ = A4
         usable_w = page_w - (doc.leftMargin + doc.rightMargin)
-        base_col_cm = [2.2, 9.0, 2.2, 2.0, 2.0, 2.0, 1.8]
+        base_col_cm = [6.5, 2.2, 2.2, 2.2, 1.8, 1.8, 1.8, 1.7]
         base_col_pts = [w * cm for w in base_col_cm]
         scale = float(usable_w) / float(sum(base_col_pts))
         col_widths = [w * scale for w in base_col_pts]
@@ -1492,13 +1493,13 @@ def editar_bien(request, pk):
             estado_actual = (obj.estado or "").upper()
             if (estado_anterior or "").upper() != estado_actual and estado_actual == "BAJA":
                 accion_log = "BAJA"
-                msg_edit = f"Se dio de baja el bien '{nombre_bien}' (Clave: {obj.clave_unica})."
+                msg_edit = f"Se dio de baja el bien '{nombre_bien}'."
             elif (estado_anterior or "").upper() == "BAJA" and estado_actual == "ACTIVO":
                 accion_log = "RESTABLECIMIENTO"
-                msg_edit = f"Se restableció el bien '{nombre_bien}' (Clave: {obj.clave_unica}) a ACTIVO."
+                msg_edit = f"Se restableció el bien '{nombre_bien}' a ACTIVO."
             else:
                 accion_log = "EDICION"
-                msg_edit = f"Se editó el bien '{nombre_bien}' (Clave: {obj.clave_unica})."
+                msg_edit = f"Se editó el bien '{nombre_bien}'."
             crear_notificacion_admins(msg_edit)
             registrar_log(request.user, accion_log, msg_edit, obj)
             
@@ -1529,7 +1530,7 @@ def eliminar_bien(request, pk):
  
     bien = get_object_or_404(BienPatrimonial, pk=pk)
     nombre_bien = getattr(bien, "nombre", None) or getattr(bien, "descripcion", "Sin nombre")
-    msg_del = f"Se eliminó definitivamente el bien '{nombre_bien}' (Clave: {bien.clave_unica})."
+    msg_del = f"Se eliminó definitivamente el bien '{nombre_bien}'."
     crear_notificacion_admins(msg_del)
     registrar_log(request.user, 'ELIMINACION', msg_del)
     
@@ -2049,7 +2050,7 @@ def dar_baja_bien(request, pk):
         update_fields.append("descripcion_baja")
     bien.save(update_fields=update_fields)
     nombre_bien = getattr(bien, "nombre", None) or getattr(bien, "descripcion", "Sin nombre")
-    msg_baja = f"Se dio de baja el bien '{nombre_bien}' (Clave: {bien.clave_unica})."
+    msg_baja = f"Se dio de baja el bien '{nombre_bien}'."
     crear_notificacion_admins(msg_baja)
     registrar_log(request.user, 'BAJA', msg_baja, bien)
     
@@ -2097,7 +2098,7 @@ def dar_baja_bienes_seleccionados(request):
         registrar_log(
             request.user,
             'BAJA',
-            f"Se dio de baja el bien '{nombre}' (Clave: {bien.clave_unica}).",
+            f"Se dio de baja el bien '{nombre}'.",
             bien,
         )
  
@@ -2140,7 +2141,7 @@ def restablecer_bien(request, pk):
     bien.save(update_fields=update_fields)
  
     nombre_bien = getattr(bien, "nombre", None) or getattr(bien, "descripcion", "Sin nombre")
-    msg_rest = f"Se restableció el bien '{nombre_bien}' (Clave: {bien.clave_unica}) a ACTIVO."
+    msg_rest = f"Se restableció el bien '{nombre_bien}' a ACTIVO."
     crear_notificacion_admins(msg_rest)
     registrar_log(request.user, 'RESTABLECIMIENTO', msg_rest, bien)
     
@@ -2195,7 +2196,7 @@ def restablecer_bienes_seleccionados(request):
         registrar_log(
             request.user,
             'RESTABLECIMIENTO',
-            f"Se restableció el bien '{nombres[-1]}' (Clave: {bien.clave_unica}) a ACTIVO.",
+            f"Se restableció el bien '{nombres[-1]}' a ACTIVO.",
             bien,
         )
  
@@ -2222,7 +2223,7 @@ def eliminar_bien_definitivo(request, pk):
     bien = get_object_or_404(BienPatrimonial, pk=pk)
     identificador = bien.clave_unica or bien.pk
     nombre_bien = getattr(bien, "nombre", None) or getattr(bien, "descripcion", "Sin nombre")
-    msg_del_def = f"Se eliminó definitivamente el bien '{nombre_bien}' (Clave: {identificador})."
+    msg_del_def = f"Se eliminó definitivamente el bien '{nombre_bien}'."
     crear_notificacion_admins(msg_del_def)
     registrar_log(request.user, 'ELIMINACION', msg_del_def)
     

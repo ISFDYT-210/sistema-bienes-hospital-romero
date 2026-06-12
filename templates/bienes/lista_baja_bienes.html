@@ -176,7 +176,6 @@
             <input type="checkbox" id="select-all-restaurar" class="form-check-input">
           </th>
           {% endif %}
-          <th>Clave Única</th>
           <th>N° de ID</th>
           <th>Descripción</th>
           <th>Cantidad</th>
@@ -208,7 +207,6 @@
             <input type="checkbox" class="form-check-input chk-restaurar" data-pk="{{ b.pk }}" data-descripcion="{{ b.descripcion|escapejs }}">
           </td>
           {% endif %}
-          <td class="text-nowrap">{{ b.clave_unica }}</td>
           <td style="max-width:120px;">{{ b.numero_identificacion|default:"—" }}</td>
           <td style="min-width:180px; max-width:250px;">{{ b.descripcion }}</td>
           <td class="text-center">{{ b.cantidad }}</td>
