@@ -61,7 +61,8 @@ class BienPatrimonial(models.Model):
     origen = models.CharField(
         max_length=15,
         choices=ORIGEN_CHOICES,
-        default=ORIGEN_COMPRA,
+        default='',
+        blank=True,
         verbose_name="Origen",
     )
     estado = models.CharField(
@@ -157,9 +158,7 @@ class BienPatrimonial(models.Model):
                 {"fecha_adquisicion": "La fecha no puede ser futura"}
             )
 
-        # Si el origen no es COMPRA ni COMPRA_MENOR, no guardamos precio
-        if self.origen not in ORIGENES_COMPRA:
-            self.valor_adquisicion = None
+        # Precio: se conserva siempre (sin importar el origen)
 
         # Si tiene fecha_baja, el estado debería ser BAJA (no obligatorio, pero consistente)
         # Podés dejar esto como warning en vez de forzar:

@@ -64,6 +64,7 @@ urlpatterns = [
 
     # Carga masiva
     path('carga-masiva/', views.carga_masiva_bienes, name='carga_masiva'),
+    path('descargar-plantilla/', views.descargar_plantilla, name='descargar_plantilla'),
 
     # Formularios / vistas legacy
     path('bienes/', views.bienes, name='bienes'),

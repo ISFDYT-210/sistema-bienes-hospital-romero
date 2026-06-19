@@ -100,8 +100,8 @@
       <select name="orden" class="form-select auto-submit">
         <option value="-fecha_baja" {% if request.GET.orden == "-fecha_baja" %}selected{% endif %}>Bajas más recientes</option>
         <option value="fecha_baja"  {% if request.GET.orden == "fecha_baja" %}selected{% endif %}>Bajas más antiguas</option>
-        <option value="-precio"     {% if request.GET.orden == "-precio" %}selected{% endif %}>Precio ↓</option>
-        <option value="precio"      {% if request.GET.orden == "precio" %}selected{% endif %}>Precio ↑</option>
+        <option value="precio"      {% if request.GET.orden == "precio" %}selected{% endif %}>Precio ↓</option>
+        <option value="-precio"     {% if request.GET.orden == "-precio" %}selected{% endif %}>Precio ↑</option>
       </select>
     </div>
     <div class="col-auto d-flex align-items-end gap-2">
@@ -128,9 +128,11 @@
           <select name="f_origen" class="form-select">
             <option value="">Todos</option>
             <option value="COMPRA"        {% if request.GET.f_origen == "COMPRA" %}selected{% endif %}>Compra</option>
+            <option value="COMPRA_MENOR"  {% if request.GET.f_origen == "COMPRA_MENOR" %}selected{% endif %}>Compra Menor</option>
             <option value="DONACION"      {% if request.GET.f_origen == "DONACION" %}selected{% endif %}>Donación</option>
             <option value="OMISION"       {% if request.GET.f_origen == "OMISION" %}selected{% endif %}>Omisión</option>
             <option value="TRANSFERENCIA" {% if request.GET.f_origen == "TRANSFERENCIA" %}selected{% endif %}>Transferencia</option>
+            <option value="__SIN__"       {% if request.GET.f_origen == "__SIN__" %}selected{% endif %}>Sin especificar</option>
           </select>
         </div>
         <div class="col-md-3">
@@ -207,7 +209,7 @@
             <input type="checkbox" class="form-check-input chk-restaurar" data-pk="{{ b.pk }}" data-descripcion="{{ b.descripcion|escapejs }}">
           </td>
           {% endif %}
-          <td style="max-width:120px;">{{ b.numero_identificacion|default:"—" }}</td>
+          <td style="max-width:120px;">{{ b.numero_identificacion|default:b.pk }}</td>
           <td style="min-width:180px; max-width:250px;">{{ b.descripcion }}</td>
           <td class="text-center">{{ b.cantidad }}</td>
           <td class="text-nowrap">{{ b.expediente.numero_expediente|default:"—" }}</td>
@@ -223,10 +225,11 @@
           <td class="text-nowrap">
             {% with label=b.get_origen_display|default:b.origen|default:"—" %}
               {% if b.origen == "COMPRA" %}<span class="badge bg-primary">{{ label }}</span>
+              {% elif b.origen == "COMPRA_MENOR" %}<span class="badge" style="background-color:#555; color:#fff;">{{ label }}</span>
               {% elif b.origen == "DONACION" %}<span class="badge bg-success">{{ label }}</span>
               {% elif b.origen == "OMISION" %}<span class="badge bg-secondary">{{ label }}</span>
               {% elif b.origen == "TRANSFERENCIA" %}<span class="badge bg-info text-white">{{ label }}</span>
-              {% elif b.origen == "__NULL__" or not b.origen %}<span class="text-muted">{{ label }}</span>
+              {% elif not b.origen %}<span class="badge" style="background-color:#6c757d; color:#fff;">Sin especificar</span>
               {% else %}<span class="badge bg-light text-dark">{{ label }}</span>
               {% endif %}
             {% endwith %}
@@ -250,7 +253,15 @@
             {% if b.valor_adquisicion %}${{ b.valor_adquisicion|floatformat:0|intcomma }}{% else %}—{% endif %}
           </td>
           <td class="text-nowrap">
-            {% if b.fecha_adquisicion %}{{ b.fecha_adquisicion|date:"d/m/Y" }}{% else %}—{% endif %}
+            {% if b.fecha_adquisicion %}
+              {% if b.fecha_adquisicion.day == 1 and b.fecha_adquisicion.month == 1 %}
+                {{ b.fecha_adquisicion|date:"Y" }}
+              {% else %}
+                {{ b.fecha_adquisicion|date:"d/m/Y" }}
+              {% endif %}
+            {% else %}
+              —
+            {% endif %}
           </td>
           <td class="text-nowrap">
             {% if b.fecha_baja %}{{ b.fecha_baja|date:"d/m/Y" }}{% else %}—{% endif %}

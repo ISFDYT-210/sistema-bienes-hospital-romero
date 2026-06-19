@@ -27,24 +27,34 @@
     <thead>
       <tr>
         <th>Descripción</th>
-        <th>N° de ID</th>
-        <th>N° de Serie</th>
+        <th style="width: 8%;">N° de ID</th>
+        <th style="width: 10%;">N° de Serie</th>
         <th>Servicios</th>
-        <th>Estado</th>
-        <th>Fecha Alta</th>
-        <th>Fecha Baja</th>
-        <th>Valor</th>
+        <th style="width: 9%;">Estado</th>
+        <th style="width: 12%; white-space: nowrap;">Fecha Alta</th>
+        <th style="width: 12%; white-space: nowrap;">Fecha Baja</th>
+        <th style="width: 13%; white-space: nowrap;">Valor</th>
       </tr>
     </thead>
     <tbody>
       {% for b in bienes %}
       <tr>
         <td>{{ b.descripcion|default:"—" }}</td>
-        <td class="text-nowrap">{{ b.numero_identificacion|default:"—" }}</td>
+        <td class="text-nowrap">{{ b.numero_identificacion|default:b.pk }}</td>
         <td class="text-nowrap">{{ b.numero_serie|default:"—" }}</td>
         <td class="text-nowrap">{{ b.servicios|default:"—" }}</td>
         <td class="text-nowrap">{{ b.get_estado_display|default:b.estado|default:"—" }}</td>
-        <td class="text-nowrap">{% if b.fecha_adquisicion %}{{ b.fecha_adquisicion|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+        <td class="text-nowrap">
+          {% if b.fecha_adquisicion %}
+            {% if b.fecha_adquisicion.day == 1 and b.fecha_adquisicion.month == 1 %}
+              {{ b.fecha_adquisicion|date:"Y" }}
+            {% else %}
+              {{ b.fecha_adquisicion|date:"d/m/Y" }}
+            {% endif %}
+          {% else %}
+            —
+          {% endif %}
+        </td>
         <td class="text-nowrap">{% if b.fecha_baja %}{{ b.fecha_baja|date:"d/m/Y" }}{% else %}—{% endif %}</td>
         <td class="text-end">{% if b.valor_adquisicion %}${{ b.valor_adquisicion|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
       </tr>

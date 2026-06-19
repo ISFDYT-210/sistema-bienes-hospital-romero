@@ -227,9 +227,7 @@ class BienPatrimonialForm(forms.ModelForm):
             self.add_error("numero_expediente", "Si informás N° de compra, debés indicar el N° de Expediente.")
 
 
-        # Precio: si el origen no es COMPRA ni COMPRA_MENOR, ignorar precio
-        if cleaned.get("origen") and cleaned["origen"] not in ORIGENES_COMPRA:
-            cleaned["valor_adquisicion"] = None
+        # Precio: se conserva siempre (sin importar el origen)
 
         estado = cleaned.get("estado")
         fecha_baja = cleaned.get("fecha_baja")

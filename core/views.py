@@ -19,7 +19,9 @@ from django.utils.text import slugify
 from core.models.notificacion import Notificacion
 from core.models.log_actividad import LogActividad
 from core.constants import MAX_NOTIFICACIONES, ORIGENES_COMPRA
-from django.http import JsonResponse, HttpResponse
+from pathlib import Path
+from django.conf import settings
+from django.http import JsonResponse, HttpResponse, FileResponse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.template.loader import render_to_string
 from django.utils import timezone
@@ -891,11 +893,20 @@ def reportes_pdf(request):
 
         for b in bienes:
             estado = b.get_estado_display() if hasattr(b, "get_estado_display") else (b.estado or "—")
-            alta = b.fecha_adquisicion.strftime("%d/%m/%Y") if b.fecha_adquisicion else "—"
+            
+            # Formatear fecha alta (solo año si es 01/01/YYYY)
+            if b.fecha_adquisicion:
+                if b.fecha_adquisicion.day == 1 and b.fecha_adquisicion.month == 1:
+                    alta = b.fecha_adquisicion.strftime("%Y")
+                else:
+                    alta = b.fecha_adquisicion.strftime("%d/%m/%Y")
+            else:
+                alta = "—"
+                
             baja = b.fecha_baja.strftime("%d/%m/%Y") if b.fecha_baja else "—"
             data.append([
                 P(b.descripcion or "—"),
-                P(b.numero_identificacion or "—"),
+                P(b.numero_identificacion or b.pk),
                 P(b.numero_serie or "—"),
                 P(b.servicios or "—"),
                 P(estado),
@@ -906,7 +917,8 @@ def reportes_pdf(request):
 
         page_w, _ = A4
         usable_w = page_w - (doc.leftMargin + doc.rightMargin)
-        base_col_cm = [6.5, 2.2, 2.2, 2.2, 1.8, 1.8, 1.8, 1.7]
+        # Columnas más anchas para Fecha Alta, Fecha Baja y Valor/Precio
+        base_col_cm = [5.5, 1.8, 1.8, 2.0, 1.6, 2.4, 2.4, 2.7]
         base_col_pts = [w * cm for w in base_col_cm]
         scale = float(usable_w) / float(sum(base_col_pts))
         col_widths = [w * scale for w in base_col_pts]
@@ -1380,8 +1392,8 @@ def _filtrar_bienes(request, base_qs):
             | Q(expediente__numero_expediente__icontains=q)
             | Q(expediente__numero_compra__icontains=q)
         )
-    if f_origen == "__NULL__":
-        base_qs = base_qs.filter(origen__isnull=True)
+    if f_origen in ("__SIN__", "__NULL__"):
+        base_qs = base_qs.filter(Q(origen__isnull=True) | Q(origen=""))
     elif f_origen:
         base_qs = base_qs.filter(origen=f_origen)
     if f_estado == "__NULL__":
@@ -1483,9 +1495,7 @@ def editar_bien(request, pk):
                     obj.expediente_baja = None
                 if hasattr(obj, "descripcion_baja"):
                     obj.descripcion_baja = ""
-            origen_nuevo = form.cleaned_data.get("origen") or obj.origen
-            if (origen_nuevo or "").upper() not in ORIGENES_COMPRA:
-                obj.valor_adquisicion = None
+            # Precio: se conserva siempre (sin importar el origen)
             if not getattr(obj, "nombre", None):
                 obj.nombre = (obj.descripcion or obj.numero_serie or "SIN NOMBRE")[:200]
             obj.save()
@@ -1598,8 +1608,11 @@ def carga_masiva_bienes(request):
                 return None
  
         def parse_date_any(v):
-            txt = s(v)
+            txt = s(v).strip()
             if not txt: return None
+            # Limpiar float years (e.g. 2025.0 -> 2025)
+            if txt.endswith(".0") and len(txt) == 6 and txt[:-2].isdigit():
+                txt = txt[:-2]
             try:
                 dt = pd.to_datetime(txt, errors="coerce", dayfirst=True)
                 if pd.isna(dt): return None
@@ -1782,7 +1795,7 @@ def carga_masiva_bienes(request):
                             precio_raw = get_first(row, ["precio", "valor", "importe", "costo", "valor adquisicion"])
                             cantidad = to_int1(get_first(row, ["cantidad"]))
                             
-                            serv_raw = s(get_first(row, ["servicios", "servicio", "sector"]) or servicio_archivo)
+                            serv_raw = get_first(row, ["servicios", "servicio", "sector"])
                             servicios = (serv_raw if serv_raw else "NO")[:200]
  
                             siem_raw = (get_first(row, ["siem", "estado siem"]) or "").strip().lower()
@@ -1793,7 +1806,7 @@ def carga_masiva_bienes(request):
                             
                             origen_val = map_origen(origen_txt)
                             estado_val = map_estado(estado_txt)
-                            precio = parse_money(precio_raw) if origen_val in ORIGENES_COMPRA else None
+                            precio = parse_money(precio_raw)
  
                             expediente_obj = None
                             if nro_exp and nro_exp.upper() != "NO":
@@ -1804,6 +1817,8 @@ def carga_masiva_bienes(request):
  
                             nombre_bien = (descripcion[:200] if descripcion else (nro_serie[:200] if nro_serie != "NO" else "NO"))
                             numero_id_val = ((numero_id or "").strip() or None)
+                            if numero_id_val and numero_id_val.upper() in ("NO", "-"):
+                                numero_id_val = None
                             if numero_id_val:
                                 numero_id_val = numero_id_val[:50]
  
@@ -1824,8 +1839,12 @@ def carga_masiva_bienes(request):
                                 "numero_compra": (nro_compra if nro_compra and nro_compra.upper() != "NO" else "NO")[:50],
                                 "siem": siem_val,
                             }
-                            if origen_val: defaults["origen"] = origen_val
-                            if estado_val: defaults["estado"] = estado_val
+                            if origen_val:
+                                defaults["origen"] = origen_val
+                            else:
+                                defaults["origen"] = ""
+                            if estado_val:
+                                defaults["estado"] = estado_val
  
                             clave_fila = clave_fila_canonica(
                                 numero_id_val,
@@ -2525,3 +2544,17 @@ def force_wipe(request):
         """)
     except Exception as e:
         return HttpResponse(f"Error general: {e}")
+
+
+@login_required
+def descargar_plantilla(request):
+    """Descarga la plantilla Excel de carga masiva."""
+    archivo = Path(settings.BASE_DIR) / "core" / "plantillas" / "CARGA_MASIVA.xlsx"
+    if not archivo.exists():
+        return HttpResponse("Plantilla no encontrada.", status=404)
+    return FileResponse(
+        open(archivo, "rb"),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        filename="CARGA_MASIVA.xlsx",
+    )

@@ -11,6 +11,7 @@ ORIGEN_TRANSFERENCIA = 'TRANSFERENCIA'
 ORIGEN_OMISION = 'OMISION'
 
 ORIGEN_CHOICES = (
+    ('', 'Sin especificar'),
     (ORIGEN_COMPRA, 'Compra'),
     (ORIGEN_COMPRA_MENOR, 'Compra Menor'),
     (ORIGEN_DONACION, 'Donación'),

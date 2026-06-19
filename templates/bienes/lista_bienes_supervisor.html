@@ -24,10 +24,10 @@
     <div class="col-md-2">
       <label class="form-label">Ordenar</label>
       <select name="orden" class="form-select auto-submit">
-        <option value="-fecha">Más recientes</option>
-        <option value="fecha">Más antiguos</option>
-        <option value="-precio">Precio ↓</option>
-        <option value="precio">Precio ↑</option>
+        <option value="-fecha"   {% if request.GET.orden == "-fecha" %}selected{% endif %}>Más recientes</option>
+        <option value="fecha"    {% if request.GET.orden == "fecha" %}selected{% endif %}>Más antiguos</option>
+        <option value="precio"   {% if request.GET.orden == "precio" %}selected{% endif %}>Precio ↓</option>
+        <option value="-precio"  {% if request.GET.orden == "-precio" %}selected{% endif %}>Precio ↑</option>
       </select>
     </div>
     <div class="col-auto d-flex align-items-end gap-2">
@@ -97,7 +97,15 @@
         {% for bien in bienes %}
         <tr>
           <td class="text-nowrap">
-            {% if bien.fecha_adquisicion %}{{ bien.fecha_adquisicion|date:"d/m/Y" }}{% else %}<span class="text-muted">—</span>{% endif %}
+            {% if bien.fecha_adquisicion %}
+              {% if bien.fecha_adquisicion.day == 1 and bien.fecha_adquisicion.month == 1 %}
+                {{ bien.fecha_adquisicion|date:"Y" }}
+              {% else %}
+                {{ bien.fecha_adquisicion|date:"d/m/Y" }}
+              {% endif %}
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
           </td>
           <td style="min-width:260px;">
             <div class="fw-semibold">{{ bien.descripcion|default:"—"|truncatechars:60 }}</div>

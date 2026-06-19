@@ -71,7 +71,7 @@
         {% for b in bienes %}
           <tr>
             <td style="min-width:240px">{{ b.descripcion|default:"—" }}</td>
-            <td class="text-nowrap">{{ b.numero_identificacion|default:"—" }}</td>
+            <td class="text-nowrap">{{ b.numero_identificacion|default:b.pk }}</td>
             <td class="text-nowrap">{{ b.numero_serie|default:"—" }}</td>
             <td class="text-nowrap">{{ b.servicios|default:"—" }}</td>
             <td class="text-nowrap">
@@ -92,7 +92,15 @@
               {% endwith %}
             </td>
             <td class="text-nowrap" style="width: 120px; text-align: center;">
-              {% if b.fecha_adquisicion %}{{ b.fecha_adquisicion|date:"d/m/Y" }}{% else %}—{% endif %}
+              {% if b.fecha_adquisicion %}
+                {% if b.fecha_adquisicion.day == 1 and b.fecha_adquisicion.month == 1 %}
+                  {{ b.fecha_adquisicion|date:"Y" }}
+                {% else %}
+                  {{ b.fecha_adquisicion|date:"d/m/Y" }}
+                {% endif %}
+              {% else %}
+                —
+              {% endif %}
             </td>
             <td class="text-nowrap" style="width: 120px; text-align: center;">
               {% if b.fecha_baja %}{{ b.fecha_baja|date:"d/m/Y" }}{% else %}—{% endif %}
